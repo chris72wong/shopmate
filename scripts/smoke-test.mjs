@@ -12,7 +12,7 @@ const port = address.port;
 await new Promise((resolve, reject) => probe.close((error) => error ? reject(error) : resolve()));
 const origin = `http://127.0.0.1:${port}`;
 const server = spawn(process.execPath, ["node_modules/next/dist/bin/next", "start", "--hostname", "127.0.0.1", "--port", String(port)], {
-  cwd: process.cwd(), env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1" }, stdio: ["ignore", "pipe", "pipe"], windowsHide: true,
+  cwd: process.cwd(), env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1", GOOGLE_MAPS_API_KEY: "" }, stdio: ["ignore", "pipe", "pipe"], windowsHide: true,
 });
 let output = "";
 let spawnError;
@@ -59,17 +59,20 @@ try {
     assert(result.data.stores.every((store) => store.distanceMeters === null));
   }
   await get("/this-page-does-not-exist", 404);
-  const health = await (await get("/api/health")).json(); assert.equal(health.data.capabilities.optimization, false);
-  await post("/api/stores", { mode: "live", location: { country: "US", postalCode: "14201" } }, 501);
+  const health = await (await get("/api/health")).json(); assert.equal(health.data.capabilities.optimization, true);
+  assert.equal(health.data.capabilities.liveDiscovery, true);
+  await post("/api/stores", { mode: "live", location: { country: "US", postalCode: "14201" } }, 503);
   await post("/api/stores", { mode: "demo", location: { country: "CA", postalCode: "invalid" } }, 422);
   const malformed = await fetch(origin + "/api/stores", { method: "POST", body: "{", signal: AbortSignal.timeout(5000) });
   assert.equal(malformed.status, 400); checks++;
-  await post("/api/optimize", {
+  const plan = await post("/api/optimize", {
     mode: "demo", country: "US", storeIds: ["demo-us-clover"], preferences: {
       weeklyBudget: { amountCents: 8000, currency: "USD" }, mealCount: 5, servingsPerMeal: 2,
       dietaryRestrictions: [], excludedIngredientIds: [], excludedAllergens: [], nutritionPriorities: [], objective: "balanced",
     },
-  }, 501);
+  }, 200);
+  assert.equal(plan.data.status, "feasible"); assert.equal(plan.data.pricingBasis, "illustrative");
+  assert(plan.data.total.amountCents <= 8000); assert.equal(plan.data.total.currency, "USD");
   await post("/api/optimize", {}, 422);
   console.log(`Production HTTP smoke checks passed (${checks} requests).`);
 } catch (error) {

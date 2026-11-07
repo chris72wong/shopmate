@@ -2,6 +2,7 @@ import "server-only";
 import { currencyForCountry, locationInputSchema } from "@/contracts";
 import { getDemoStores } from "@/data/demo-stores";
 import type { StoreDiscoveryProvider } from "./provider";
+import { invalidRequest } from "@/server/errors";
 
 export const demoStoreDiscovery: StoreDiscoveryProvider = {
   async discover(request) {
@@ -21,11 +22,11 @@ export const demoStoreDiscovery: StoreDiscoveryProvider = {
   async resolveStores(ids, country) {
     const stores = getDemoStores(country);
     if (new Set(ids).size !== ids.length || ids.length < 1 || ids.length > 3) {
-      throw new Error("Select one to three different demo stores.");
+      invalidRequest("storeIds", "Select one to three different demo stores.");
     }
     return ids.map((id) => {
       const store = stores.find((entry) => entry.id === id);
-      if (!store) throw new Error("Unknown demo store for this country.");
+      if (!store) invalidRequest("storeIds", "Unknown demo store for this country.");
       return store;
     });
   },
