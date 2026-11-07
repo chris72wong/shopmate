@@ -11,7 +11,6 @@ export function RecipeCard({ recipe, index = 0 }: { recipe: Recipe; index?: numb
     <div className="recipe-content">
       <div className="recipe-meta"><span>{recipe.totalMinutes} min</span><span aria-hidden="true">·</span><span>{recipe.servings} servings</span></div>
       <h3>{recipe.name}</h3>
-      <p>{recipe.description}</p>
       <span className="nutrition-note">~{Math.round(recipe.nutritionPerServing.proteinG)} g protein / serving · estimate</span>
     </div>
   </article>;

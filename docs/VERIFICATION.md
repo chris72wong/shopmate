@@ -28,3 +28,7 @@ Browser inspection covered wide/narrow landing and pantry layouts, no horizontal
 - Google attribution UI, public policy pages, public paid-API request controls, and the full five-step user journey remain future work.
 - CI configuration is included, but no remote repository or GitHub Actions run was created. Vercel was not deployed.
 - No worktrees or subagents were created. The preview server was stopped after inspection; run `npm run dev` to restart it.
+
+## Country-first UI revision
+
+Re-ran `npm run verify` after replacing the marketing landing page with country selection and a validated postal/ZIP field: lint, strict types, all 63 tests, the production build, and all 13 HTTP smoke requests passed. Browser checks covered both countries, empty/invalid input, Canadian normalization, leading-zero ZIP codes, keyboard submission, focus on country changes, retained input within the flow, and correct CAD/USD demo navigation. Narrow layouts had no horizontal overflow. The recipe library starts collapsed and expands successfully. Live discovery remains unimplemented; continuing explicitly opens fictional demo stores. The postal code stays in component state and is not included in the demo URL or sent to a server.

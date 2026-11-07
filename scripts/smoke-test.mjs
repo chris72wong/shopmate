@@ -44,7 +44,9 @@ try {
   }
   assert(ready, `Production server did not become ready: ${output}`);
   const home = await (await get("/")).text();
-  assert(home.includes("Eat better.")); assert(home.includes("Spend smarter."));
+  assert(home.includes("Choose your country"));
+  assert(home.includes("Canada")); assert(home.includes("United States"));
+  assert(!home.includes("hero-visual"), "The entry page must start with the location flow");
   const cssPath = home.match(/href="([^"]+\.css(?:\?[^"]*)?)"/)?.[1];
   assert(cssPath, "The home page must load generated CSS");
   const css = await (await get(cssPath.replaceAll("&amp;", "&"))).text();

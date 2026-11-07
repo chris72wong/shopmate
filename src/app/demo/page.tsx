@@ -7,7 +7,7 @@ import { formatMoney } from "@/lib/format";
 import { demoStoreDiscovery } from "@/server/discovery/demo";
 import { illustrativePricing } from "@/server/pricing/illustrative";
 
-export const metadata: Metadata = { title: "The demo pantry" };
+export const metadata: Metadata = { title: "Demo stores" };
 
 export default async function DemoPage({ searchParams }: { searchParams: Promise<{ country?: string }> }) {
   const query = await searchParams;
@@ -21,14 +21,13 @@ export default async function DemoPage({ searchParams }: { searchParams: Promise
   }));
 
   return <div className="page-width demo-page">
-    <div className="demo-heading"><span className="eyebrow">THE SHOPMATE PREVIEW</span><h1>A small taste<br /><em>of a better week.</em></h1><p>Meet the ingredients of ShopMate: simple recipes and a clearly labeled sample grocery catalog.</p></div>
-    <aside className="demo-notice"><strong>You’re in demo mode.</strong> These stores and addresses are fictional. Prices are illustrative examples, not live retailer prices. This preview does not search your location or generate a meal plan.</aside>
+    <div className="demo-heading"><h1>Demo stores</h1><p>Fictional stores. Illustrative prices. Not based on your location.</p></div>
     <section className="demo-stores" aria-labelledby="stores-title">
-      <div className="section-heading"><div><span className="eyebrow">FICTIONAL STORES · SAMPLE PRICES</span><h2 id="stores-title">A neighborhood, imagined.</h2></div>
+      <div className="section-heading"><h2 id="stores-title" className="sr-only">Fictional stores</h2><Link href="/" className="text-link">← Start over</Link>
         <nav className="country-switch" aria-label="Demo currency"><Link href="/demo?country=CA" aria-current={country === "CA" ? "page" : undefined}>Canada · CAD</Link><Link href="/demo?country=US" aria-current={country === "US" ? "page" : undefined}>US · USD</Link></nav>
       </div>
-      <div className="store-grid">{previews.map(({ store, offer }, index) => <article className="store-card" key={store.id}><span className="store-icon" aria-hidden="true">0{index + 1}</span><span className="store-label">FICTIONAL DEMO STORE</span><h3>{store.name}</h3><p>{store.address}</p><div className="sample-price"><div><span>Sample package</span><strong>1 kg gluten-free oats</strong></div><span>{offer ? formatMoney(offer.price) : "Pricing unavailable"}</span></div><span className="nutrition-note">Illustrative price · No nearby distance</span></article>)}</div>
+      <div className="store-grid">{previews.map(({ store, offer }) => <article className="store-card" key={store.id}><h3>{store.name}</h3><p>{store.address}</p><div className="sample-price"><strong>1 kg gluten-free oats</strong><span>{offer ? formatMoney(offer.price) : "Pricing unavailable"}</span></div></article>)}</div>
     </section>
-    <section id="recipes" className="demo-recipes" aria-labelledby="recipes-title"><div className="section-heading"><div><span className="eyebrow">THE RECIPE PANTRY</span><h2 id="recipes-title">Everyday food. Plenty of possibility.</h2></div><span className="recipe-count">14 curated recipes</span></div><div className="recipe-grid">{recipes.map((recipe, index) => <RecipeCard key={recipe.id} recipe={recipe} index={index} />)}</div><p className="section-note">Nutrition values are project-authored estimates. Dietary labels describe sample ingredients; always check product labels for allergens and cross-contact.</p></section>
+    <details id="recipes" className="recipe-library"><summary><span>Browse recipes</span><span className="recipe-count">14</span></summary><div className="recipe-grid">{recipes.map((recipe, index) => <RecipeCard key={recipe.id} recipe={recipe} index={index} />)}</div><p className="section-note">Estimated nutrition. Check product labels for allergens.</p></details>
   </div>;
 }

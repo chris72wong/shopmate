@@ -9,7 +9,7 @@ The current milestone establishes a working foundation so three developers can i
 ### Included now
 
 - Next.js App Router with TypeScript, React, Tailwind v4, route handlers, Zod, ESLint, and Vitest.
-- A responsive, branded shell and read-only pantry preview using original local SVG artwork.
+- A minimal country-first entry flow, validated postal/ZIP input, and an explicitly labeled demo preview with an optional recipe library.
 - Explicit CA/US fictional demo stores and an illustrative pricing provider; no credentials needed.
 - Shared interfaces and validated requests for location, discovery, ingredients, recipes, products, pricing, preferences, and optimization results.
 - A curated catalog of 14 recipes, 31 canonical ingredients/packages, six named chain pricing profiles, and six fictional demo pricing profiles.
@@ -18,7 +18,7 @@ The current milestone establishes a working foundation so three developers can i
 
 ### Deferred to the parallel implementation
 
-- Interactive location/store/preferences/results screens.
+- Live store selection, preferences, and results screens. The country/postal-code entry UI already exists and currently leads only to explicit demo data.
 - Google geocoding, Places API (New), chain matching, and live attribution UI.
 - Recipe combination search, ingredient consolidation, package counts, basket comparisons, and recommendations.
 - User-facing complete/infeasible/incomplete result states and real end-to-end journey tests.

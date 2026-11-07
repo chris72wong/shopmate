@@ -2,7 +2,7 @@
 
 **Eat better. Spend smarter.** A grocery comparison and meal planning MVP for UB Hacking 2026.
 
-This repository is the **shared foundation**, ready for independent frontend, store-discovery, and optimization worktrees. It includes a working branded Next.js shell, a read-only demo pantry, request validation, API scaffolds, provider interfaces, and a curated sample catalog. It does not yet search Google or optimize meals.
+This repository is the **shared foundation**, ready for independent frontend, store-discovery, and optimization worktrees. Start by choosing a country, then enter a validated postal or ZIP code to open the explicitly labeled demo stores. Recipes are available in a collapsed library. Shared contracts, API scaffolds, provider interfaces, and the curated catalog support later implementation. It does not yet search Google or optimize meals; demo stores do not use or retain the entered postal code.
 
 ## Run locally
 

@@ -4,7 +4,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: { default: "ShopMate — Eat better. Spend smarter.", template: "%s · ShopMate" },
-  description: "A thoughtful way to plan meals and grocery spending. Explore the ShopMate foundation with clearly labeled illustrative data.",
+  description: "Eat better. Spend smarter. Choose your country to get started with ShopMate.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
