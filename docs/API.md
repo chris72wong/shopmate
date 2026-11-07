@@ -1,6 +1,22 @@
 # Shared API contract — version 1
 
-The authoritative TypeScript definitions are in `src/contracts/`. These contracts let the frontend, discovery, and optimization agents work independently. Coordinate shared changes with main. All endpoints are same-origin Next.js route handlers, with JSON payloads and no authentication in this MVP.
+Reviewed November 7, 2026. The authoritative **current v1** TypeScript definitions are in `src/contracts/`; no runtime/type/schema changes were made in this review. The [recovery plan](../PLAN.md) records implementation evidence and delivery gates. The [proposed v2 extension](#proposed-v2-verified-pricing-contract-not-implemented) below specifies the missing verified-pricing boundary without pretending v1 supports it.
+
+These contracts let frontend and backend work against one interface. Coordinate shared changes with the integrator. All current endpoints are same-origin Next.js route handlers, with JSON payloads and no authentication.
+
+## Implementation status and client responsibilities
+
+| Surface | Current behavior | Frontend rule |
+| --- | --- | --- |
+| `GET /api/health` | Works; only demo discovery is enabled | Capability flags describe implementation, not key presence or verified price coverage |
+| `POST /api/stores`, `mode: "demo"` | Works; fixed fictional stores, independent of postal code/radius | Label fictional stores and illustrative prices; never call them nearby |
+| `POST /api/stores`, `mode: "live"` | Valid request returns 501, regardless of credentials | Keep the error visible; do not manufacture/fallback to demo results |
+| `POST /api/optimize` | Schema-valid request returns 501 in either mode | Do not synthesize a plan from a loading animation or scaffold response |
+| Catalog/price HTTP endpoints | None exist | Current server-rendered preview reads local data directly; provider interfaces are not public endpoints |
+
+The entry UI currently calls neither POST route: it only navigates to `/demo?country=CA|US` and discards the entered location from the journey. The following optimization success types are reserved contracts, not working responses. Response/domain arithmetic invariants are not executable response Zod schemas today.
+
+For the eventual journey, keep country/location, selected IDs, and preferences in one frontend flow state. Clear stores/results after location/mode changes and clear results after selection/preferences changes; ignore stale in-flight responses. Render store/attribution values as text and safe links. The backend owns store identity, price/nutrition provenance, constraints, and all calculations.
 
 ## Envelope and errors
 
@@ -29,6 +45,8 @@ Responses include `Cache-Control: no-store` and `X-ShopMate-Contract-Version: 1`
 | `500 internal-error` | Future unexpected internal failure; sanitize before returning |
 
 Only 200/400/422/501 paths are currently implemented by the stores/optimization routes. Next.js supplies `405` for unsupported methods; framework-level errors need not use this envelope. A valid empty store search is `200` with `stores: []`. A valid but impossible plan is an optimization domain result, not an HTTP error.
+
+Live implementation must map missing credentials to 503, upstream quota to 429, deadlines/provider failures to 502, and unexpected failures to sanitized 500 responses. A provider returning no stores for an otherwise valid location is different from a geocoder failing to resolve that location (404). Never return raw exceptions, credentials, or key-bearing upstream URLs.
 
 Unknown object fields are rejected. Numeric inputs must be JSON numbers; there is no string-to-number coercion. `mode` is always required. A missing/failed live provider must never silently switch to demo.
 
@@ -135,14 +153,16 @@ Do not send store objects, client-provided prices, recipes, nutritional assertio
 
 **Foundation:** valid requests return 501 with `error.code: "not-implemented"`; invalid input returns 400/422. No fake feasible or infeasible plan is generated.
 
+Here “valid” means schema-valid. Known store/ingredient lookup and live-country verification are still pending: well-formed unknown IDs can pass the schema before the 501. Before implementation returns results, resolve store IDs and reject unknown exclusion IDs with 422 field details. Selecting several stores means comparing a full basket at each; v1 does not support splitting purchases across stores.
+
 ### Future success data: `OptimizationResult`
 
 All result variants contain `mode`, `country`, `currency`, `pricingBasis: "illustrative"`, `notices`, and `search: { evaluatedCombinations, exhaustive }`. These are domain variants inside `ok: true`.
 
 | Status | Fields and meaning |
 | --- | --- |
-| `feasible` | `optimality: "proven" | "best-found"`; plan, complete/unavailable baskets, recommended store, total, remaining budget, reuse, and optional basket savings |
-| `infeasible` | `reason: "budget" | "dietary-constraints" | "pricing-unavailable"`, `message`, `minimumKnownCost: Money | null`; must have exhausted the documented candidate space |
+| `feasible` | `optimality: "proven" \| "best-found"`; plan, complete/unavailable baskets, recommended store, total, remaining budget, reuse, and optional basket savings |
+| `infeasible` | `reason: "budget" \| "dietary-constraints" \| "pricing-unavailable"`, `message`, `minimumKnownCost: Money \| null`; must have exhausted the documented candidate space |
 | `incomplete` | `reason: "search-limit"`, `message`; capped search found no feasible plan and cannot prove infeasibility |
 
 Feasible fields:
@@ -166,3 +186,100 @@ Feasible fields:
 `src/server/pricing/provider.ts`: `getOffers(store, productIds)`. `status: "available"` means an illustrative catalog can be read; missing product IDs can still be absent from the returned offers. The engine must detect incomplete baskets.
 
 `src/server/optimization/engine.ts`: `optimize(request, resolvedStores, pricingProvider)`. This interface is reserved for Agent C. Main coordinates live-provider composition after B and C merge.
+
+## Proposed v2 verified-pricing contract (not implemented)
+
+This is a documentation design for the intended real-price flow. **No `/api/v2/*` route, type, response validator, pricing credential, or adapter below exists yet.** Keep current v1 paths/types/IDs intact. Implement v2 types, strict schemas, routes, and shared contract tests together before the frontend sends these payloads. New routes will use the same `ApiResponse<T>` envelope/error codes and no-store policy, with `X-ShopMate-Contract-Version: 2`. Currently nonexistent v2 paths simply return the framework's 404; they do not already return typed errors.
+
+V2 preserves country/currency, ingredient/recipe IDs, units, preference fields, and feasible/infeasible/incomplete semantics. `mode` still selects discovery provenance; **v2 live permits verified prices or unavailable pricing only**, while v2 demo remains explicitly illustrative. This tightens the intended product behavior without reinterpreting the existing v1 illustrative-only types. Never cast a real offer into `ProductOffer` or rename a sample offer “live.”
+
+### Endpoint sequence
+
+| Proposed endpoint | Request | Success `data` |
+| --- | --- | --- |
+| `GET /api/v2/catalog?country=CA` | Exactly one required `country=CA\|US` | `{ catalogVersion, country, currency, ingredients: Ingredient[], recipes: Recipe[], products: ProductPackage[] }`; local curated metadata, estimated nutrition, no provider prices |
+| `POST /api/v2/stores` | Existing `StoreDiscoveryRequest` fields/limits | Existing `StoreDiscoveryResult`, except stores use `StoreV2` below; actual branch names/addresses only from discovery; demo remains separate |
+| `POST /api/v2/pricing` | `{ mode, country, storeIds, catalogVersion }`; 1–3 distinct discovered IDs | `PricingResultV2` below, covering the catalog's candidate ingredients; an offer subset does not promise a complete basket |
+| `POST /api/v2/optimize` | Existing `OptimizationRequest` plus required `catalogVersion` | `OptimizationResultV2` below; server independently re-resolves IDs and fetches current offers once for this run |
+
+`catalogVersion` is an opaque server-owned catalog revision; a mismatch returns `422 invalid-request` at `catalogVersion` and the client reloads the catalog. New provider packages receive stable namespaced IDs rather than changing the meaning of existing `pkg-*` fixtures. Price preflight is informational: do not send prices or provider-store mappings back to optimization. The result uses one internally consistent offer set per run; preflight prices can change before optimization. No database or retained Google search payload is required.
+
+### Stores and branch verification
+
+`StoreV2` retains every existing store field and the `source: "demo" | "google"` union/IDs. Replace only its `pricing` field with:
+
+```ts
+type PriceChannel = "in-store" | "pickup" | "delivery";
+type StorePricingV2 =
+  | { status: "illustrative"; profileId: PricingProfileId } // demo only
+  | { status: "verified-capable"; providerId: string; channel: PriceChannel } // live only
+  | { status: "unavailable"; profileId: null; reason: string };
+```
+
+`verified-capable` means a configured, authorized adapter has established the exact provider branch mapping; it is a capability, not proof that all ingredients have prices/stock. The server owns this mapping and must revalidate it; a chain-name match or an Instacart organization-level retailer key is insufficient. Unmatched/ambiguous stores remain discoverable with unavailable pricing. No real addresses, place IDs, or price examples are invented in this contract. Provider access requirements and official documentation are linked in [PLAN.md](../PLAN.md#external-services-and-access-gates).
+
+### Offers, freshness, and missing coverage
+
+The proposed shape reuses existing `Money`, `ProductPackage`, `ProductOffer`, and `Country` definitions where stated. New types in this section are documentation only:
+
+```ts
+interface VerifiedOffer {
+  product: ProductPackage; // exact SKU's mapped ingredient and usable package content
+  price: Money;           // full package price, never prorated ingredient cost
+  basis: "verified";
+  available: true;
+  provenance: {
+    providerId: string;
+    providerStoreId: string;
+    providerProductId: string;
+    channel: PriceChannel;
+    priceType: "regular" | "unconditional-sale";
+    retrievedAt: string;             // ISO 8601 UTC; our successful retrieval time
+    providerUpdatedAt: string | null; // only when actually supplied by provider
+    expiresAt: string;               // app freshness deadline, not a checkout guarantee
+    sourceUrl: string | null;        // safe public product link, never an API/key URL
+  };
+}
+type PricingSetV2 =
+  | { status: "available"; storeId: string; basis: "illustrative";
+      offers: ProductOffer[]; missingIngredientIds: string[] }
+  | { status: "available"; storeId: string; basis: "verified";
+      offers: VerifiedOffer[]; missingIngredientIds: string[] }
+  | { status: "unavailable"; storeId: string;
+      reason: "unsupported-store" | "provider-not-configured" | "provider-error"
+        | "rate-limited" | "no-usable-offers";
+      message: string };
+interface PricingResultV2 {
+  mode: "demo" | "live";
+  country: Country;
+  currency: "CAD" | "USD";
+  catalogVersion: string;
+  stores: PricingSetV2[]; // exactly one per selected ID, in requested order
+  notices: string[];
+}
+```
+
+All money must be positive integer cents in the selected currency. A verified product must have a reviewed ingredient/preparation-state mapping, positive usable content in the canonical unit, and valid package metadata. Reject expired/missing prices, ambiguous sizes, unavailable items, and unsupported substitutions. The initial adapter excludes variable-weight, loyalty/coupon/minimum-spend offers; unconditional sales require known validity. Never infer that “400 g canned” means 400 g drained or that ml equals g.
+
+Each adapter publishes its supported countries/branches, channel, freshness TTL, and price-eligibility rules in server configuration. `expiresAt` is the earlier of that TTL deadline and any known offer expiry. `retrievedAt` does not claim the retailer updated the price at that instant. Do not combine different channels in a comparison. Show channel, retrieval time, excluded tax/fees/deposits, and price-change limitations near real-price totals.
+
+`missingIngredientIds` is sorted relative to all candidate catalog ingredients, not a selected meal basket. A store may be available with partial coverage or zero offers; the engine determines completeness for each chosen plan. A failed store can coexist with successful sets in a 200 response. If no selected store can be queried due to missing configuration, return 503; if all fail due to upstream quota, return 429; other wholly failed upstream requests return 502 (with 502 taking precedence for mixed upstream failures). Unsupported stores or successful queries with no usable offers are domain unavailability, not invented zero-cost baskets.
+
+### Optimization result and invariants
+
+`OptimizationResultV2` keeps the v1 discriminated result variants and fields, with these coordinated changes:
+
+| Field | Proposed v2 semantics |
+| --- | --- |
+| `pricingBasis` | `"illustrative"` for demo, `"verified"` for live; never mixed |
+| `catalogVersion`, `optimizerVersion` | Required opaque catalog/scoring-rule revisions |
+| `pricing` | Required `PricingResultV2` containing the exact offers used for this run, including provenance/package metadata |
+| `search` | Retain `evaluatedCombinations` and `exhaustive`; add `evaluationLimit` (positive integer) and sorted `candidateRecipeIds` so the candidate space is explicit |
+| `baskets` (feasible only) | Preserve complete/unavailable union; complete basket `basis` matches `pricingBasis`. Unavailable baskets still have no total. Every selected store gets an entry. |
+| `BasketLine` | Keep v1 fields. `unitPrice` is the price of one whole package. Allow several products for an ingredient; allocated `required` quantities across those lines sum to that ingredient's requirement, and each `purchased = required + leftover`. |
+
+Scale meals before aggregation; sum purchase subtotals in cents. Require the country's currency and full priced ingredient coverage for a complete basket; verified comparisons must also use one channel. `recommendedStoreId`, `total`, and `budgetRemaining` refer to the cheapest complete selected-store basket for that plan. Equal totals break by store ID; plan-score ties use complete cost, recipe-ID multiset, then store ID. Only complete identical-plan baskets support `basketSavings`. Multiple selected stores do not imply a split-store shopping route.
+
+Keep hard constraints and the high-protein soft priority unchanged. Nutrition stays estimated. Record objective/scoring rules under `optimizerVersion`; ingredient reuse and package leftovers can influence balanced ranking, but do not imply actual measured waste prevention. After a cap, return feasible `best-found` or `incomplete`, never proven optimality/infeasibility. An exhausted search proves only the explicitly documented catalog/candidate space. When no plan has full pricing, use `pricing-unavailable` after an exhaustive search rather than implying dietary or budget infeasibility.
+
+Before enabling v2, add contract/route/provider/engine tests for branch verification, provenance, freshness boundaries, unit/package mappings, no mixed bases/channels/currencies, unknown IDs, partial failures, complete basket totals, budget edges, exclusions, deterministic ties, and capped search. Add a browser journey against implemented routes and separately document credentialed provider smoke results. A typed proposal or mocked HTTP fixture is not verification of a real integration.

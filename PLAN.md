@@ -1,142 +1,73 @@
-# ShopMate foundation and MVP plan
+# ShopMate recovery plan
 
-## Purpose and milestone
+Reviewed November 7, 2026. This is a documentation-only review; no application rewrite, provider integration, worktree, or delegation is authorized by it. [The shared API contract](docs/API.md) distinguishes the existing v1 interface from the proposed verified-pricing extension.
 
-ShopMate helps people plan meals they enjoy while managing grocery spending and dietary preferences. **Eat better. Spend smarter.** The UB Hacking 2026 MVP combines real nearby grocery discovery with explicitly illustrative grocery prices and a deterministic, package-aware meal planner.
+## What exists
 
-The current milestone establishes a working foundation so three developers can implement independently. It deliberately stops before the complete user journey.
+The repository is a sound **foundation preview**, not a working grocery planner. Keep Next.js App Router, strict TypeScript, Tailwind, Zod, the cream/forest/sage/apricot theme, the catalog, and the provider boundaries.
 
-### Included now
-
-- Next.js App Router with TypeScript, React, Tailwind v4, route handlers, Zod, ESLint, and Vitest.
-- A minimal country-first entry flow, validated postal/ZIP input, and an explicitly labeled demo preview with an optional recipe library.
-- Explicit CA/US fictional demo stores and an illustrative pricing provider; no credentials needed.
-- Shared interfaces and validated requests for location, discovery, ingredients, recipes, products, pricing, preferences, and optimization results.
-- A curated catalog of 14 recipes, 31 canonical ingredients/packages, six named chain pricing profiles, and six fictional demo pricing profiles.
-- Working demo discovery, capability reporting, typed API scaffolds, regression tests, production HTTP smoke checks, and CI.
-- Architecture, API/data assumptions, ownership boundaries, worktree commands, and deployment handoff.
-
-### Deferred to the parallel implementation
-
-- Live store selection, preferences, and results screens. The country/postal-code entry UI already exists and currently leads only to explicit demo data.
-- Google geocoding, Places API (New), chain matching, and live attribution UI.
-- Recipe combination search, ingredient consolidation, package counts, basket comparisons, and recommendations.
-- User-facing complete/infeasible/incomplete result states and real end-to-end journey tests.
-
-### Out of scope for the MVP
-
-Authentication, accounts, payment processing, databases, live retailer price feeds, scraping, nutrition guarantees, multi-store split baskets, delivery/tax estimates, travel routing, and LLM-generated meals/prices. Publishing/deployment is a later user decision.
-
-## User flow
-
-1. **Location:** explicitly choose Canada or the US, enter a postal/ZIP code, normalize and validate it. Set CAD/USD from country. Format validation does not prove that a postal code exists; live geocoding does.
-2. **Stores:** choose live discovery or an explicitly labeled demo. Search server-side within a configurable 1–50 km radius (5 km default). Show names, addresses, straight-line distances, pricing availability, and required attribution. Select one to three stores. Demo stores have no coordinates or distances and ignore location/radius.
-3. **Preferences:** enter budget, number of meals (1–14), servings per meal (1–8), dietary restrictions, excluded ingredient IDs/allergens, high-protein priority, and cost/nutrition/balanced objective. Weekly budget covers the planned meal basket, not every food eaten in a week.
-4. **Optimization:** validate stores again on the server, filter recipes against hard constraints, evaluate candidate plans, consolidate ingredients, round to purchasable packages, and compare the identical basket at each selected store.
-5. **Results:** show the cheapest complete feasible store basket for the chosen plan, comparisons, meal servings, estimated total nutrition, consolidated shopping list, leftovers, remaining budget, and defensible reuse/savings explanations. Explain no-feasible-plan or incomplete-search states without inventing results.
-
-## Architecture
-
-```text
-Browser UI (Agent A)
-  -> POST /api/stores (Agent B)
-       -> StoreDiscoveryProvider
-            -> explicit demo implementation (exists)
-            -> Google Geocoding + Places New (pending)
-  -> POST /api/optimize (Agent C, integration by main)
-       -> StoreDiscoveryProvider.resolveStores (server-authoritative metadata)
-       -> OptimizationEngine (pending)
-            -> curated recipes + canonical ingredients
-            -> GroceryPricingProvider
-                 -> illustrative local offers (exists)
-                 -> real pricing feed (future, outside MVP)
-  <- ApiResponse<T> using shared domain/request/result types
-```
-
-Keep the UI, discovery, and optimization independent. The frontend imports `src/contracts/` and consumes JSON endpoints; it does not import provider implementations. Next server pages may read the local catalog for the foundation preview. The API validates requests once at the boundary, then performs business validation using server-owned metadata.
-
-`src/contracts/domain.ts` defines entities and discriminated results. `api.ts` defines requests, response envelopes, and contract version. `schemas.ts` defines executable validation/normalization. Types are shared; the schemas validate untrusted input. Full field semantics and current/future endpoint behavior are in `docs/API.md`.
-
-### Server boundaries
-
-- `StoreDiscoveryProvider.discover(request)` returns normalized location, origin, stores, attribution, and notices. `resolveStores(ids, country)` re-resolves selected IDs in the same mode/country before optimization; a stateless Google implementation can use Place Details (New) for IDs from discovery. No database/session cache is required.
-- `GroceryPricingProvider.getOffers(store, productIds)` returns available illustrative offers or unavailable status. An available catalog can still omit requested products; the basket calculator must check every required ingredient.
-- `OptimizationEngine.optimize(request, stores, pricing)` is the deterministic calculation boundary. Route handlers only validate, resolve providers, invoke the engine, and serialize.
-- Main owns any composition/resolver wiring across B and C. Agent C can complete demo optimization using the existing resolver without importing Agent B's unfinished Google implementation.
-
-### Store identity and pricing
-
-Demo IDs are `demo-ca-cedar` (and clover/orchard), with analogous US IDs. Google IDs will be `google:<placeId>`. Demo and Google are distinct store types; demo coordinates, maps URI, place ID, and distance are always null.
-
-Chain matching is country-scoped and conservative. Initial chain IDs: `ca-loblaws`, `ca-no-frills`, `ca-walmart`, `us-aldi`, `us-kroger`, `us-walmart`. Unknown stores remain discoverable, with unavailable pricing. Six fictional demo profiles are separate from these chain identities. All twelve profiles use illustrative data. Country prices are independent authored samples, not exchange-rate conversions.
-
-Clients send only selected IDs to optimization. Reject unknown IDs and wrong-country stores server-side. Never accept price, chain, dietary, or nutrition assertions supplied by clients as trusted data. Review cost/abuse controls before enabling public Google-backed routes.
-
-### Google integration and attribution
-
-Agent B implements server-side requests with a country-restricted geocoder, timeouts, appropriate field masks, result limits, and provider errors. Suggested Places fields: ID, display name, formatted address, coordinates, address country components, Maps URI, and attribution. Avoid fetching photos/reviews in the MVP.
-
-Return empty `stores` for a valid search with no stores; do not invent results. Return structured errors for unconfigured provider, quota, upstream failure, or invalid/nonexistent location. Never silently switch mode.
-
-Live results need the official Google Maps attribution treatment, any third-party attributions, and applicable public Terms/Privacy pages. Follow current retention policies; do not introduce persistent Google-content caching. Attribution metadata alone is not sufficient to render a compliant UI. These requirements are a live-launch gate, not a claim that the foundation already implements Google.
-
-References: [Geocoding requests](https://developers.google.com/maps/documentation/geocoding/requests-geocoding), [Nearby Search New](https://developers.google.com/maps/documentation/places/web-service/nearby-search), [Places policies and attribution](https://developers.google.com/maps/documentation/places/web-service/policies).
-
-## Data and calculations
-
-See `src/data/README.md` for all assumptions. IDs are stable and units are canonical: grams, milliliters, or count. Recipe quantities cover the full yield. Nutrition is estimated per serving from the same structured ingredients. Packages describe usable contents, including drained canned beans and edible produce portions.
-
-All ingredients except water have package prices. Pantry staples are not free by default. No tax, delivery, coupons, promotions, or travel costs are included. Do not silently substitute wheat pasta/tortillas/soy sauce in a gluten-free plan. Certified gluten-free oats are a specific fixture assumption, not a statement about all oats.
-
-### Agent C implementation sequence
-
-1. Validate IDs/country/currency and filter recipes. Every selected dietary tag must be supported; any excluded ingredient/allergen disqualifies the recipe. Vegan already implies vegetarian in the dataset.
-2. Scale each recipe's amounts by `servingsPerMeal / recipe.servings`. Aggregate by ingredient ID and unit across meal slots before rounding packages.
-3. For one package option, buy `ceil(totalRequired / usablePackageContent)`. Avoid floating-point boundary errors with normalized quantities or an explicit tolerance. For future multiple package sizes, choose the cheapest combination that covers the requirement, rather than selecting only by unit price.
-4. For each store, require complete ingredient coverage and matching currency. Add integer package purchase costs. Missing prices create an unavailable basket, never a falsely cheap partial total.
-5. Evaluate plans under the hard budget using the cheapest complete store basket for each plan. Recommend the cheapest complete selected-store basket for the chosen plan, including when the meal objective favors nutrition.
-6. Rank by objective using documented, deterministic scores. Cost objective minimizes full purchase cents. Nutrition emphasizes protein and fiber; high-protein priority adds a protein weight. Balanced combines cost, nutrition, variety, and reuse. Specify normalization/weights in implementation docs before treating scores as comparable.
-7. Use a bounded deterministic multiset search or branch-and-bound; start with at most two occurrences per recipe and stable ID ordering. Do not use wall-clock time or randomness as the primary cutoff. Define an evaluation cap and expose search completeness.
-8. Stable tie-breaking: score, complete basket cost, recipe-ID multiset, then store ID. Slot ordering must also be stable. Return feasible `best-found` if a capped search finds a plan; return `incomplete` if it stops without one. Only exhausted searches may claim `infeasible` or `proven` optimality within the documented candidate space.
-9. Calculate reuse savings against independently buying packages for each meal at the recommended store. Calculate store-comparison savings only against another complete selected-store basket for the identical plan. Never compare hypothetical prorated ingredient costs to package totals as a savings claim.
-
-The foundation contains interfaces and fixtures for these steps, not the optimization implementation.
-
-## Parallel workstreams and completion criteria
-
-### Agent A — frontend
-
-Own UI routes/components/styles and browser-side state. Implement the five-step journey using shared validated inputs and `ApiResponse<T>`. Build with mock responses only when explicitly labeled; keep real network errors visible. Handle loading, empty discovery, unavailable pricing, max-three selection, constraints, and all optimization result variants. Keep current branding, accessible controls, and desktop/mobile usability. Completion requires browser checks and integration against real local routes.
-
-### Agent B — store discovery
-
-Own discovery providers, `/api/stores`, chain matching, and discovery-specific tests. Preserve shared schema behavior. Implement Google discover/resolve, country verification, straight-line distances, attribution metadata, unknown-chain handling, and sanitized provider failures. Test with authored synthetic fixtures, not copied live Google payloads. A missing key must yield `503 provider-not-configured` after implementation. No real-key tests are required for CI.
-
-### Agent C — optimization
-
-Own the engine, pricing/basket logic, `/api/optimize`, and calculation tests. Implement demo optimization first against the existing demo resolver and structured catalog. Cover aggregation before package rounding, leftovers, multiple servings/repeated meals, budget boundaries, currency consistency, excluded allergens/ingredients, unsupported stores, missing offers, deterministic ties, infeasible inputs, and incomplete searches. Additive catalog changes require reference/label checks.
-
-### Main — integration
-
-Own shared contracts/root configs/dependencies and cross-module wiring. Merge one workstream at a time, verify contracts, coordinate changes to shared files, then connect Google store resolution to optimization and finish attribution/policy UI. Run full verification and browser-based journey checks. Prepare Vercel without adding accounts, payment systems, a database, or other scope.
-
-## Phases and gates
-
-| Phase | Deliverable | Exit gate |
+| Feature | Observed behavior and evidence | Status |
 | --- | --- | --- |
-| 0: foundation (current) | Shared code/data/docs, shell, explicit demo discovery | Lint/types/tests/build/production HTTP smoke pass; main commit exists |
-| 1: parallel implementation | A frontend, B discovery, C optimizer | Owned feature tests and contract-compatible commits |
-| 2: integration | Complete demo journey, then Google-backed discovery | Cross-store same-basket calculations; responsive/accessibility checks; truthful labels |
-| 3: release preparation | Vercel settings, server key, limits/attribution/policy pages | Full journey, no-key/error behavior, production build, secrets review |
+| Canada/US entry | `src/components/location-flow.tsx` chooses country/currency, validates postal/ZIP syntax, and preserves leading-zero ZIPs. `tests/contracts.test.ts` covers schema behavior. | Works for format validation; no geographic lookup |
+| Search submission | Navigates to `/demo?country=…`; the postal code is not sent to `/api/stores` or retained in the URL. `/demo` supplies its own fixture postal code. | Navigation works; nearby search does not |
+| Store discovery | `POST /api/stores` returns three fictional stores per country in explicit demo mode. Names/addresses come from `src/data/demo-stores.ts`; coordinates and distances are null. | Working fixture endpoint, not actual stores |
+| Live discovery | `src/app/api/stores/route.ts` returns `501 not-implemented`, even if a Google key is present. No Google request implementation or chain matcher exists. | Stub |
+| Store selection and preferences | Demo store cards are read-only. No multi-select, budget/diet form, shared journey state, or results screen exists. | Missing |
+| Prices | `src/server/pricing/illustrative.ts` filters authored sample offers. The UI shows one oats package per fictional store. All 372 offers, including real-chain-named profiles, are illustrative. | Fixture pricing works; no retailer integration |
+| Meals and nutrition | 14 recipes, 31 ingredients/packages, derived dietary/allergen tags and estimated nutrition; integrity tests check internal consistency. Cards show summaries, not meal selection. | Sample catalog works; real-world accuracy unverified |
+| Optimization | `src/server/optimization/engine.ts` is only an interface. Valid `/api/optimize` requests return `501`. | No search, baskets, package rounding, reuse, waste ranking, or recommendations |
+| API safeguards | Strict request schemas, integer cents, country/currency checks, explicit mode, error envelopes, no-store headers. | Works at schema/transport level |
+| Business validation | Demo ID resolver rejects unknown IDs, but optimization never calls it. A correctly prefixed nonexistent store or unknown well-formed ingredient ID can reach the 501 stub. | Required before engine execution |
 
-## Verification strategy
+The UI fragmentation is functional: location input ends at a disconnected preview, and the remaining journey has no controls or state. Responsive CSS, focus styles, reduced-motion handling, original SVG illustrations, and truthful sample labels already exist. A new visual shell alone would not repair the missing flow.
 
-Foundation tests exercise contract normalization/limits, catalog references/units/diet/allergen/nutrition consistency, pricing profiles, fictional-store provenance, provider behavior, and actual route responses. Production smoke checks build output over HTTP: home/CSS, CA/US demo, health, 404, demo discovery, validation errors, and intentional 501 endpoints. This is transport coverage, not a completed user-journey E2E test.
+## Intended journey and truth rules
 
-Future engine tests use exact package/budget edge cases. Discovery tests mock network calls and cover upstream failures without credentials. Frontend/browser tests cover the actual integrated journey after it exists. Run checks appropriate to changed behavior; do not claim a completed feature from a scaffold test.
+1. **Location:** choose CA/US, derive CAD/USD, validate syntax, then geocode within the selected country. Format validity does not establish postal-code existence. Changing country or location clears dependent stores/results.
+2. **Stores:** show provider-returned grocery names, actual addresses, Maps links, attribution, and labeled straight-line distances. Select 1–3 stores. Unsupported pricing stays visible; a chain-name match does not establish branch prices. Empty results and provider errors remain visible.
+3. **Prices and preferences:** establish verified branch/SKU/package coverage where an authorized adapter exists; collect budget, meals, servings, diets, exclusions, and objective. A separate, explicit sample demo can use the existing fictional fixtures without requiring a location search.
+4. **Plan:** server resolves IDs, filters hard constraints, consolidates ingredient quantities, purchases whole packages, checks complete same-currency baskets against budget, then ranks feasible plans deterministically.
+5. **Results:** meals, estimated nutrition, one comparable complete basket per selected store, cheapest complete store for that plan, shopping list, remaining budget, and package leftovers/reuse. Multi-store **selection/comparison** is in scope; splitting a basket across stores is later work.
 
-## Operational constraints
+Never mix verified and illustrative offers or quietly replace live failures with fixtures. Never show an incomplete subtotal as a comparable total. Nutrition/high-protein/reuse/waste ranking are soft objectives; budget, dietary restrictions, exclusions, and full ingredient coverage are hard constraints. All required ingredients except water cost money. Leftovers estimate unused package contents, not measured food waste or shelf-life outcomes.
 
-Node 24 LTS, npm lockfile, separate installations/build state per worktree. `GOOGLE_MAPS_API_KEY` is optional for the foundation and required only for live discovery after Agent B implements it. No secret reaches React client bundles. Vercel-compatible Node route handlers and ordinary Next.js build/start scripts require no custom server.
+## External services and access gates
 
-See `docs/WORKTREES.md` for creation/integration commands and `docs/DEPLOYMENT.md` for release setup. No worktrees, subagents, remote repositories, or deployments are created by the foundation task.
+These are candidates, not installed or tested integrations. Credential values were not inspected and no paid provider calls were made.
+
+| Need | Service/access | Recovery decision |
+| --- | --- | --- |
+| Actual stores/addresses in CA and US | Google Cloud project with billing, Geocoding API and Places API (New), server-only `GOOGLE_MAPS_API_KEY` (the only key declared in `.env.example`). | Implement country-restricted geocoding, Nearby Search, and Place Details for ID resolution. Google place data is not a grocery SKU price feed. See [Geocoding](https://developers.google.com/maps/documentation/geocoding/requests-geocoding), [Nearby Search](https://developers.google.com/maps/documentation/places/web-service/nearby-search), and [billing/field masks](https://developers.google.com/maps/documentation/places/web-service/usage-and-billing). |
+| A narrow real-price US slice | Evaluate Kroger Products/Locations APIs; application registration generates OAuth client credentials. Proposed server settings: `KROGER_CLIENT_ID`, `KROGER_CLIENT_SECRET`; neither is wired. | First prove granted product/location access, branch mapping, returned prices, usable package sizes, coverage, and permission for this comparison use. No integration or approved access is established. See [Kroger's official collection](https://www.postman.com/kroger/the-kroger-co-s-public-workspace/collection/ki6utqb/kroger-public-apis) and [reference](https://developer.kroger.com/reference/). |
+| Other retailers, especially Canada | An authorized feed with branch/SKU prices, package content, timestamps, availability, and display/comparison rights; credentials depend on the provider. | No verified Canadian or cross-retailer adapter exists here. Fixture names do not establish Loblaws/No Frills/Walmart/ALDI access. Do not promise nationwide price coverage. |
+| Optional shopping handoff | Instacart Developer Platform API key with granted endpoint permissions. | Public shopping-list/recipe links do not establish an optimizer price feed. Its nearby-retailer response identifies organizations, not physical branches/addresses. Verify additional catalog rights before considering it a pricing source. See [API overview](https://docs.instacart.com/developer_platform_api/api/overview), [nearby retailers](https://docs.instacart.com/developer_platform_api/api/retailers/get_nearby_retailers), and [access limits](https://docs.instacart.com/developer_platform_api/faq). |
+| Nutrition/planning | Existing structured catalog; no API key or LLM needed. | Keep estimates visible. Traceable composition/branded-label data is a later accuracy upgrade; current tests certify consistency, not real-world nutrient/allergen accuracy. |
+
+For Google, bound radius/results, use explicit field masks/deadlines, sanitize errors, and add quotas/request controls. Before exposing live results, provide official Google Maps logo treatment, applicable third-party attribution, public Terms/Privacy pages, and retention handling. This project keeps the stricter logo requirement in `AGENTS.md`. See [Google's policies](https://developers.google.com/maps/documentation/places/web-service/policies) and [deployment gates](docs/DEPLOYMENT.md). Do not persist search payloads or log postal codes/precise locations. The list-only UI needs no browser Maps SDK/key.
+
+## Hackathon delivery order
+
+Assume roughly 24–36 engineering hours; provider approval/coverage is an external dependency, not a deadline guarantee. Work sequentially in the current checkout unless the user later authorizes parallel work.
+
+| Order | Deliverable | Acceptance gate |
+| --- | --- | --- |
+| 1. Establish access early | Time-box a Google credential check and one pricing adapter/branch/product spike. Record countries/branches, price channel, package mappings, access rights, and gaps. | Authenticated requests succeed; no sample values or undocumented coverage claims. If unavailable, retain the limitation and continue independent planner work. |
+| 2. Complete the local planner | Demo ID/business validation, dietary filtering, serving scaling, aggregation, complete per-store baskets, whole-package buying, budgets, deterministic search, reuse and leftovers. | Exact package/budget/exclusion/missing-price tests; feasible, infeasible, and capped-search results tested. This can form an end-to-end **explicit sample** experience without credentials. |
+| 3. Connect one coherent UI | Five steps with retained selections, back navigation, labels, loading/errors/empty states, and all result variants. Reuse the theme/components; consumer copy replaces scaffold/agent language. | Browser tests exercise CA/US from entry through preferences to results against actual local routes; keyboard/mobile checks pass. |
+| 4. Enable actual discovery | Google adapter, authoritative ID resolution, country checks, attribution/error handling; wire location submission to `/api/stores`. | Synthetic upstream tests plus separate credentialed CA/US smoke runs. Unconfigured/quota/timeout/empty searches never become fictional success. Stores without verified prices show no real-price plan. |
+| 5. Optional verified-price slice | After step 1 passes, implement proposed v2 for one provider and a curated, completely mapped recipe subset. Fetch once per optimization request and use that fixed offer set. | Provenance/freshness/missing-coverage tests plus a credentialed end-to-end run. Label exact branch/channel coverage. Real comparisons need two complete selected-store baskets; one complete store supports only a single-store plan. |
+
+The credible event deliverable is a tested sample planner and, with Google access, actual nearby discovery. A real-price plan is conditional on verified access and complete recipe coverage; a CA/US-wide live comparison service is not a defensible event promise. Defer accounts, databases, scraping, checkout, split-store allocation, routing, taxes/fees, variable-weight goods, loyalty-dependent pricing, and verified nutrition guarantees. No deployment is performed by this review.
+
+## Calculation and verification gates
+
+- Reject unknown/wrong-country/mode store IDs and unknown exclusion IDs server-side. Never trust browser prices, package sizes, nutrition, or chain mappings.
+- Scale full recipe yields, aggregate by ingredient/unit **before** rounding, and preserve dry/drained/edible semantics. Never convert ml to g implicitly. With multiple package sizes, choose a covering combination by full purchase cost; exclude ambiguous/variable-weight mappings initially.
+- Compare identical requirements at each store. Every ingredient needs coverage, including pantry oil. Missing offers make that store basket unavailable with no total; other complete baskets can still compete.
+- Document/version objective weights and stable tie-breaking. Balanced ranking includes protein/fiber estimates, variety, ingredient reuse, and normalized leftover-package fractions; do not add grams, ml, and counts into a single waste weight. High protein has no hard minimum in v1.
+- Use a deterministic evaluation cap. Truncation permits `best-found`, or `incomplete` if no feasible plan was found. Only exhaustion of the documented candidate space permits `infeasible` or `proven`. No hidden recipe-repeat limits followed by claims of global impossibility.
+- Reuse savings compare separate-meal packages with consolidated packages at the same store. Store savings compare complete baskets for the same plan. Never invent checkout savings or market-wide optimality.
+
+Review run: **`npm run verify` passed** on November 7, 2026 (Node 24.15.0, npm 11.12.1): lint, typecheck, 4 test files / 63 tests, production build, and 13 HTTP smoke requests. The suite covers contracts, fixture integrity/providers, route validation, and deliberate 501 behavior. It contains no optimizer implementation tests, live external-service tests, or automated browser journey. No fresh browser/accessibility inspection was performed; earlier manual checks remain historical in [VERIFICATION.md](docs/VERIFICATION.md).
+
+Before marking later work complete, run repository checks plus the feature-specific gates above. Capability flags require implementation and passing integration tests; credentials, interface definitions, fixtures, and a green scaffold suite are insufficient.
