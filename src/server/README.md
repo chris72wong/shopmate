@@ -53,7 +53,7 @@ Each run fetches offers once per selected store. Recipe yields scale before ingr
 
 Scoring revision `catalog-multiset-1`: cost-first strictly minimizes full purchase cents; high-protein can break equal-cost plan ties. Nutrition-first uses protein (70%) and fibre (30%) per serving, scaled to 40 g / 12 g for ranking, with small cost (.05), leftover (.03), and variety (.03) terms. Balanced weights are cost .55, nutrition .25, variety .10, leftover .07, reuse .03. High-protein adds a .15 protein ranking term outside cost-first. These are soft ranking scales, not dietary targets or guarantees. Leftover fractions are normalized per ingredient; grams, millilitres and counts are never summed as a waste weight. Ties use cost, recipe-ID multiset, then store ID. Store ties use cents then ID.
 
-Ingredient reuse compares consolidated purchases with buying each meal's packages separately at the recommended store. Basket savings compare the identical requirements at another complete selected-store basket. Nutrition derives from consumed ingredient quantities, not purchased packages, and remains sample estimates.
+Ingredient reuse compares consolidated purchases with buying each meal's packages separately at the recommended store. If this optional baseline reaches its package-search limit, the affected reuse estimate is omitted with a notice; the valid basket and candidate-search proof are unaffected. Basket savings compare the identical requirements at another complete selected-store basket. Nutrition derives from consumed ingredient quantities, not purchased packages, and remains sample estimates.
 
 ## Verification commands
 

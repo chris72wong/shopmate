@@ -263,7 +263,22 @@ export function createPackageOptimizer<B extends PriceBasis>(basis: B, options: 
     const ingredientReuse: IngredientReuse[] = winner.requirements.flatMap(item => {
       const usedBy = winner.meals.filter(recipe => recipe.ingredients.some(ingredient => ingredient.ingredientId === item.ingredientId));
       if (usedBy.length < 2) return [];
-      const separate = usedBy.flatMap(recipe => purchase(winner.recommended.storeId, aggregateRequirements([recipe], preferences.servingsPerMeal).find(requirement => requirement.ingredientId === item.ingredientId)!)!);
+      const separate: BasketLine[] = [];
+      // This optional explanation must not invalidate a complete, ranked basket.
+      // Its independent baseline does not participate in the candidate search.
+      for (const recipe of usedBy) {
+        const requirement = aggregateRequirements([recipe], preferences.servingsPerMeal).find(requirement => requirement.ingredientId === item.ingredientId)!;
+        try {
+          const lines = purchasePackages(item.ingredientId, requirement, packagesByStore.get(winner.recommended.storeId)?.get(item.ingredientId) ?? [], currency);
+          if (!lines) return [];
+          separate.push(...lines);
+        } catch (error) {
+          if (!(error instanceof PackageSearchLimitError)) throw error;
+          const notice = "Some ingredient-reuse savings could not be calculated within the comparison limit and are omitted. Basket totals are unaffected.";
+          if (!notices.includes(notice)) notices.push(notice);
+          return [];
+        }
+      }
       const consolidated = winner.recommended.lines.filter(line => line.ingredientId === item.ingredientId);
       return [{ ingredientId: item.ingredientId, recipeIds: item.usedByRecipeIds, packagesAvoided: Math.max(0, packageTotal(separate) - packageTotal(consolidated)),
         estimatedSavings: { amountCents: Math.max(0, moneyTotal(separate) - moneyTotal(consolidated)), currency } }];

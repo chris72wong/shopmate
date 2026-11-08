@@ -65,7 +65,10 @@ function FeasiblePlan({ result, plan, stores, recipes, ingredients, products, on
   const allLines = mixed?.lines ?? (basket?.status === "complete" ? basket.lines.map(line => ({ ...line, storeId: basket.storeId })) : []);
   const lines = mixed && basketStoreId !== "all" ? allLines.filter(line => line.storeId === basketStoreId) : allLines;
   const listTotal = mixed ? (basketStoreId === "all" ? mixed.total : mixed.stores.find(store => store.storeId === basketStoreId)?.total) : basket?.status === "complete" ? basket.total : null;
-  const keyFor = (index: number) => `${basketStoreId}:${index}`;
+  const keyFor = (index: number) => {
+    const line = lines[index]!;
+    return JSON.stringify([line.storeId, line.ingredientId, line.productId]);
+  };
   const done = lines.filter((_, index) => checked.includes(keyFor(index))).length;
   const basisLabel = result.pricingBasis === "verified" ? "Verified quote" : "Illustrative";
   const pricing = "pricing" in result ? result.pricing : null;

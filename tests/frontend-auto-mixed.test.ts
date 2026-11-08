@@ -97,12 +97,21 @@ describe("automatic selection and mixed plans in the integrated frontend", () =>
     await button("Package details");
     expect(host.textContent).toContain("leftover");
     const checkbox = host.querySelector<HTMLInputElement>('.grocery-line input')!;
+    const checkedStoreName = checkbox.closest("label")!.querySelector("small")!.textContent;
+    const checkedStoreId = discovery.stores.find(store => store.name === checkedStoreName)!.id;
     await act(async () => checkbox.click());
     expect(host.textContent).toContain("1/6 done");
     const select = host.querySelector("select")!;
-    await act(async () => { select.value = discovery.stores[0]!.id; select.dispatchEvent(new Event("change", { bubbles: true })); });
+    await act(async () => { select.value = checkedStoreId; select.dispatchEvent(new Event("change", { bubbles: true })); });
     expect(host.querySelectorAll(".grocery-item")).toHaveLength(2);
     expect(host.textContent).toContain("assigned subtotal");
+    expect(host.textContent).toContain("1/2 done");
+    const checkedItem = host.querySelector<HTMLInputElement>('.grocery-line input:checked')!;
+    expect(checkedItem).not.toBeNull();
+    await act(async () => checkedItem.click());
+    await act(async () => { select.value = "all"; select.dispatchEvent(new Event("change", { bubbles: true })); });
+    expect(host.textContent).toContain("0/6 done");
+    expect(host.querySelectorAll('.grocery-line input:checked')).toHaveLength(0);
   });
   it("rejects mixed plans with unrelated branches, currency, totals, missing oil or false proof", async () => {
     const { result, input } = await splitPlan();

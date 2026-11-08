@@ -93,6 +93,29 @@ try {
     assert(result.data.total.amountCents <= 8000); assert(result.data.search.candidateRecipeIds.length);
     assert.deepEqual(discovery.data.selectedStoreIds, input.storeIds);
     assert(result.data.mixedStorePlan.total.amountCents <= 8000);
+    for (const basket of result.data.baskets.filter(basket => basket.status === "complete")) {
+      assert.equal(basket.total.amountCents, basket.lines.reduce((sum, line) => sum + line.subtotal.amountCents, 0));
+      assert(basket.lines.every(line => line.subtotal.amountCents === line.packageCount * line.unitPrice.amountCents));
+    }
+    const preferences = { weeklyBudget: { amountCents: 8000, currency: country === "CA" ? "CAD" : "USD" }, mealCount: 1, servingsPerMeal: 1,
+      dietaryRestrictions: ["vegan"], excludedIngredientIds: ["peanut-butter"], excludedAllergens: ["peanuts"], nutritionPriorities: [], objective: "minimize-cost" };
+    const small = (await post("/api/v2/optimize", { ...input, preferences }, 200)).data;
+    const large = (await post("/api/v2/optimize", { ...input, preferences: { ...preferences, servingsPerMeal: 8 } }, 200)).data;
+    for (const planned of [small, large]) {
+      assert.equal(planned.status, "feasible");
+      assert(planned.meals.every(meal => {
+        const recipe = catalog.recipes.find(recipe => recipe.id === meal.recipeId);
+        return recipe.diets.includes("vegan") && !recipe.allergens.includes("peanuts");
+      }));
+      assert(!planned.requirements.some(item => item.ingredientId === "peanut-butter"));
+      assert.equal(planned.budgetRemaining.amountCents, 8000 - planned.total.amountCents);
+    }
+    assert(large.total.amountCents >= small.total.amountCents, "Serving more people cannot lower the minimum package cost");
+    assert.equal(large.meals[0].servings, 8);
+    const tight = (await post("/api/v2/optimize", { ...input, preferences: { ...preferences, weeklyBudget: { ...preferences.weeklyBudget, amountCents: 1 } } }, 200)).data;
+    assert.equal(tight.status, "infeasible"); assert.equal(tight.reason, "budget");
+    assert(tight.search.exhaustive); assert(tight.minimumKnownCost.amountCents > 1);
+    assert.equal(tight.mixedStorePlan, null); assert(!("total" in tight));
     const automatic = await post("/api/v2/plan", { mode: "demo", location: { country, postalCode: country === "CA" ? "M5V 2T6" : "02108" }, catalogVersion: catalog.catalogVersion,
       preferences: { weeklyBudget: { amountCents: 8000, currency: country === "CA" ? "CAD" : "USD" }, mealCount: 2, servingsPerMeal: 2, dietaryRestrictions: [], excludedIngredientIds: [], excludedAllergens: [], nutritionPriorities: [], objective: "balanced" } }, 200);
     assert.equal(automatic.data.status, "planned"); assert.equal(automatic.data.selectedStoreIds.length, 3);
