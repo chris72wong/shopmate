@@ -25,8 +25,9 @@ export function createRetailPricingService(options: PricingOptions = {}) {
   const adapter = options.adapter ?? new ReefPricingAdapter();
   const now = options.now ?? Date.now;
   const readConfig = () => options.config ?? loadRetailConfig();
+  const mappingsFor = (binding: BranchBinding, config: RetailConfig) => config.mappings.filter(item => item.providerId === binding.providerId && item.retailer === binding.retailer).slice(0, 12);
   function validateStores(mode: DataMode, country: Country, stores: readonly ResolvedStore[]) {
-    if (!stores.length || stores.length > 3 || stores.some(store => store.country !== country || store.source !== (mode === "demo" ? "demo" : "google"))) invalidRequest("storeIds", "Resolve selected stores in the same country and mode.");
+    if (!stores.length || stores.length > 3 || new Set(stores.map(store => store.id)).size !== stores.length || stores.some(store => store.country !== country || store.source !== (mode === "demo" ? "demo" : "google"))) invalidRequest("storeIds", "Resolve one to three different selected stores in the same country and mode.");
   }
   async function pricing(mode: DataMode, country: Country, stores: readonly ResolvedStore[]): Promise<PricingResultV2> {
     validateStores(mode, country, stores);
@@ -44,12 +45,13 @@ export function createRetailPricingService(options: PricingOptions = {}) {
         continue;
       }
       const binding = bindingForStore(store, config);
-      if (!binding) { results.push({ status: "unavailable", storeId: store.id, reason: "unsupported-store", message: "No verified provider mapping exists for this physical branch." }); continue; }
-      if (!adapter.configured()) { results.push({ status: "unavailable", storeId: store.id, reason: "provider-not-configured", message: "Real pricing requires a server-side ReefAPI key." }); continue; }
+      if (!binding) { results.push({ status: "unavailable", storeId: store.id, reason: "unsupported-store", message: "Ingredient prices are unavailable for this store. Its location is not connected to a verified retailer price source. Google supplies locations, not ingredient prices." }); continue; }
+      if (!adapter.configured()) { results.push({ status: "unavailable", storeId: store.id, reason: "provider-not-configured", message: "Real retailer pricing is not configured for this store. Google supplies locations, not ingredient prices." }); continue; }
+      const mappings = mappingsFor(binding, config);
+      if (!mappings.length) { results.push({ status: "unavailable", storeId: store.id, reason: "provider-not-configured", message: "Ingredient pricing has not been configured for this store’s products. No sample prices were substituted." }); continue; }
       try {
         withinDeadline();
         await adapter.verifyBranch(binding);
-        const mappings = config.mappings.filter(item => item.providerId === binding.providerId && item.retailer === binding.retailer).slice(0, 12);
         const offers: Extract<PricingSetV2, { basis: "verified" }>["offers"] = [];
         for (const mapping of mappings) {
           withinDeadline();
@@ -67,7 +69,9 @@ export function createRetailPricingService(options: PricingOptions = {}) {
       } catch (error) {
         const code = error instanceof ServiceError ? error.error.code : "provider-error";
         results.push({ status: "unavailable", storeId: store.id, reason: code === "rate-limited" ? "rate-limited" : code === "provider-not-configured" ? "provider-not-configured" : "provider-error",
-          message: "Real pricing could not be verified at this branch. Sample prices were not substituted." });
+          message: code === "provider-not-configured" ? "Real retailer pricing is not configured for this store. No sample prices were substituted."
+            : code === "rate-limited" ? "Retailer price checks are busy for this store. Try again later."
+            : "Ingredient prices could not be verified at this store. Try again or choose other stores. No sample prices were substituted." });
       }
     }
     // A quote from the first branch may expire while a later branch is fetched.
@@ -80,16 +84,22 @@ export function createRetailPricingService(options: PricingOptions = {}) {
     if (mode === "live" && !results.some(result => result.status === "available")) {
       const failures = results.filter(result => result.status === "unavailable" && ["provider-error", "rate-limited", "provider-not-configured"].includes(result.reason));
       if (failures.length) {
+        const details = results.flatMap((result, index) => result.status === "unavailable" ? [{ path: `storeIds.${index}`, message: result.message }] : []);
         const has = (reason: string) => failures.some(result => result.status === "unavailable" && result.reason === reason);
-        if (has("provider-error")) throw new ServiceError(502, { code: "provider-error", message: "No selected branch returned usable real pricing." });
-        if (has("rate-limited")) throw new ServiceError(429, { code: "rate-limited", message: "Retail pricing limits were reached. Try again later." });
-        throw new ServiceError(503, { code: "provider-not-configured", message: "Real pricing credentials are missing for the supported selected stores." });
+        if (has("provider-error")) throw new ServiceError(502, { code: "provider-error", message: "Ingredient prices unavailable. Try again or choose other stores.", details });
+        if (has("rate-limited")) throw new ServiceError(429, { code: "rate-limited", message: "Ingredient prices unavailable. Retail pricing limits were reached. Try again later or choose other stores.", details });
+        throw new ServiceError(503, { code: "provider-not-configured", message: "Ingredient prices unavailable. Real retailer pricing is not configured for the selected stores. Choose other stores or explicitly open the sample experience.", details });
       }
     }
     const channels = new Set(results.flatMap(result => result.status === "available" && result.basis === "verified" ? result.offers.map(offer => offer.provenance.channel) : []));
     if (channels.size > 1) invalidRequest("storeIds", "Choose stores with the same price channel. In-store, pickup and delivery baskets cannot be compared together.");
+    const coverageNotices = !results.some(result => result.status === "available" && result.offers.length > 0)
+      ? ["Ingredient prices unavailable. Choose other stores, retry the price check, or explicitly open the sample experience. Google provides store locations, not ingredient prices."]
+      : results.some(result => result.status === "unavailable" || result.missingIngredientIds.length > 0)
+        ? ["Ingredient price coverage is partial. You may continue, but a plan needs every required ingredient priced at one selected store. The planner checks basket completeness; incomplete baskets have no comparable total."] : [];
     return { mode, country, currency, catalogVersion: CATALOG_VERSION, stores: results,
       notices: mode === "demo" ? ["Fictional demo stores and illustrative prices only."] : ["Real quotes are limited to reviewed products at verified physical branches in one price channel.",
+        ...coverageNotices,
         "At most 12 reviewed product searches per store per run. Missing or unqueried ingredients remain unavailable.",
         "Loyalty, coupons, multi-buy, estimated variable-weight and expired prices are excluded. Taxes, fees and deposits are excluded.", "Retailer quotes may change before checkout. Nutrition and allergen metadata remain sample estimates."] };
   }
@@ -114,11 +124,15 @@ export function createRetailPricingService(options: PricingOptions = {}) {
   }
   async function storePricing(store: Store): Promise<StorePricingV2> {
     if (store.source === "demo") return store.pricing.status === "illustrative" ? store.pricing : { ...store.pricing, reason: "No sample pricing profile is available." };
-    const binding = bindingForStore(store, readConfig());
-    if (binding && adapter.configured()) {
-      try { await adapter.verifyBranch(binding); return { status: "verified-capable" as const, providerId: binding.providerId, channel: binding.channel }; } catch { /* Explicit unavailable state below. */ }
-    }
-    return { status: "unavailable" as const, profileId: null, reason: "Real pricing is unavailable or not verified for this physical branch." };
+    let config: RetailConfig;
+    try { config = readConfig(); }
+    catch { return { status: "unavailable", profileId: null, reason: "Ingredient prices unavailable. Real retailer pricing needs valid store and product configuration." }; }
+    const binding = bindingForStore(store, config);
+    if (!binding) return { status: "unavailable", profileId: null, reason: "Ingredient prices unavailable. This store is not connected to a verified retailer price source." };
+    if (!adapter.configured()) return { status: "unavailable", profileId: null, reason: "Ingredient prices unavailable. Real retailer pricing is not configured." };
+    if (!mappingsFor(binding, config).length) return { status: "unavailable", profileId: null, reason: "Ingredient prices unavailable. Pricing for this store’s products has not been configured." };
+    try { await adapter.verifyBranch(binding); return { status: "verified-capable", providerId: binding.providerId, channel: binding.channel }; }
+    catch { return { status: "unavailable", profileId: null, reason: "Ingredient prices unavailable. This store’s retailer price source could not be verified. Retry or choose other stores." }; }
   }
   return { pricing, optimize, storePricing };
 }
