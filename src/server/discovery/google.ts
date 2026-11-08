@@ -64,7 +64,7 @@ function validGrocery(place: Place, country: Country): boolean {
 function identity(place: Place, country: Country): ResolvedStore {
   const chainId = matchChain(place.displayName.text, country);
   return { id: `google:${place.id}`, name: place.displayName.text, address: place.formattedAddress, country, chainId, source: "google",
-    pricing: chainId ? { status: "illustrative", profileId: chainId } : { status: "unavailable", profileId: null } };
+    pricing: { status: "unavailable", profileId: null } };
 }
 
 export function createGoogleStoreDiscovery(options: GoogleOptions = {}): StoreDiscoveryProvider {
@@ -139,7 +139,7 @@ export function createGoogleStoreDiscovery(options: GoogleOptions = {}): StoreDi
       return { mode: "live", location: { ...request.location, currency: currencyForCountry(request.location.country) },
         origin: { label: origin.formatted_address, coordinates }, radiusKm: request.radiusKm, stores,
         attributions: [...attributions.values()], notices: ["Store names, addresses and locations are provided by Google Maps. Distances are straight-line, not driving distances.",
-          "All supported price profiles are illustrative sample prices, not live or branch-specific retailer quotes. Other stores have unavailable pricing."] };
+          "Store discovery does not supply product prices. Request verified pricing separately; sample optimization is available only in explicit demo mode."] };
     },
     async resolveStores(ids, country) {
       if (ids.length < 1 || ids.length > 3 || new Set(ids).size !== ids.length || ids.some(id => !/^google:[A-Za-z0-9_-]{1,240}$/.test(id))) invalidRequest("storeIds", "Select one to three different Google store IDs.");

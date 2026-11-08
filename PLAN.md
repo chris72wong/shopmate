@@ -1,6 +1,6 @@
 # ShopMate recovery plan
 
-Reviewed November 7, 2026. This is a documentation-only review; no application rewrite, provider integration, worktree, or delegation is authorized by it. [The shared API contract](docs/API.md) distinguishes the existing v1 interface from the proposed verified-pricing extension.
+Historical foundation review, November 7, 2026. The original assessment below records the earlier stubs. Subsequent user-authorized backend implementation now includes Google discovery, the deterministic optimizer and additive v2 retailer pricing. See [the current API contract](docs/API.md), [backend handoff](src/server/README.md) and [pricing/access verification](docs/PRICING.md). No provider credentials have been supplied; source trials and synthetic application tests are distinguished there. This history does not supersede the user's current backend scope.
 
 ## What exists
 

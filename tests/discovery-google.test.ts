@@ -79,7 +79,7 @@ describe("Google discovery", () => {
   it("re-resolves place IDs and refuses wrong-country, non-grocery or changed identities", async () => {
     const { google, fetcher } = provider({ ...place(), displayName: { text: "Walmart Supercentre" } });
     const [store] = await google.resolveStores(["google:synthetic"], "CA");
-    expect(store).toMatchObject({ chainId: "ca-walmart", pricing: { status: "illustrative", profileId: "ca-walmart" } });
+    expect(store).toMatchObject({ chainId: "ca-walmart", pricing: { status: "unavailable", profileId: null } });
     expect(store).not.toHaveProperty("distanceMeters");
     expect(new Headers(fetcher.mock.calls[0]![1]?.headers).get("X-Goog-FieldMask")).toContain("addressComponents");
     await expect(provider(place("synthetic", "US")).google.resolveStores(["google:synthetic"], "CA")).rejects.toMatchObject({ status: 422 });
@@ -89,7 +89,7 @@ describe("Google discovery", () => {
   it("does not claim sample prices are live quotes after recognizing a banner", async () => {
     const { google } = provider(geocode(), { places: [{ ...place(), displayName: { text: "Loblaws" } }] });
     const result = await google.discover(request());
-    expect(result.stores[0]?.pricing.status).toBe("illustrative"); expect(result.notices.join(" ")).toContain("not live or branch-specific");
+    expect(result.stores[0]?.pricing.status).toBe("unavailable"); expect(result.notices.join(" ")).toContain("only in explicit demo mode");
   });
   it("bounds upstream calls per process and releases concurrency after errors", async () => {
     let now = 100_000; const gate = new GoogleRequestGate(1, 1, () => now);
