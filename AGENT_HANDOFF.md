@@ -1,50 +1,50 @@
-# ShopMate rescue handoff
+# ShopMate connected-product handoff
 
-## Branch and verified implementation
+## Delivery
 
-Development branch: `codex/meal-to-groceries`.
-Verified implementation commit: `c1b29ebd64ec8a5c8d608b53052c4adc6506f49c` (Build real Gemini meal-to-grocery workflow).
-A documentation-only delivery commit follows it. Resolve the exact final tip with `git log -1 --oneline`; the final chat reply also records it. Main was preserved. Existing origin: `https://github.com/chris72wong/shopmate.git`; connected GitHub metadata verified repository identity and push permission.
+Branch: `codex/meal-to-groceries`.
+Verified implementation: `4486a9ee76f411cfc78f72913e28501256deb622` — Connect nearby grocers to meal shopping and bundle food imagery.
+A documentation-only delivery commit follows; use `git log -1 --oneline` for the final tip. Existing origin is `https://github.com/chris72wong/shopmate.git`. Main remains unchanged. Earlier Gemini rescue implementation is preserved in the branch history.
 
-## What changed
+## Ready to demo
 
-- `/plan` is now a real meal-to-grocery flow instead of requiring unavailable retailer prices.
-- Server-side `gemini-3.5-flash-lite` generation with structured JSON, strict Zod parsing, household/count/dietary checks, sanitized errors, a 55-second deadline, no automatic billable retries, and no fictional fallback.
-- The configured `GEMINI_API_KEY` was verified with the real model. The schema sent to Google is a structural subset: the full Zod schema caused a real 400 invalid-argument response; projection fixed it. Full response validation remains in place.
-- Meals vary across regeneration. Single-meal swaps retain the other meals and send existing ingredient naming/measurement conventions. Stable local slot IDs preserve ingredient-use counts.
-- Deterministic ingredient aggregation preserves g/ml/each and dry/drained/edible/as-sold semantics. Check-offs are retained only when identity and required quantity still match. Copy/download omits checked groceries.
-- Genuine Walmart Canada, Walmart US and Kroger search URLs. No invented product/price/cart/stock claims. Optional actual Google nearby grocers with official logo/attributions.
-- Household slider with responsive people illustrations, budget-guidance slider, diets/allergens/protein, concise responsive UI, keyboard tabs and reduced motion. Exclude Ingredients is absent from the primary journey.
-- Legacy `/demo` and optimizer routes remain explicitly illustrative/evidence-gated, separate from the primary workflow. No root dependency or lockfile changes.
+The verified production app is running at **http://localhost:3000/plan**, exec session `17444`. The browser has a real US vegetarian plan associated with an actual Buffalo Tops store. The plan has three meals, bundled photorealistic images, a consolidated 15-ingredient list and a pantry check-off. Refresh resets in-memory plan/checklist/store state.
+
+If the server ends with the host session, restart:
+
+```powershell
+npm start -- --hostname 127.0.0.1 --port 3000
+```
+
+Use `DEMO_GUIDE.md` for the updated four-step, two-minute walkthrough. Stop this checkout's server before rebuilding. Older ShopMate production servers on ports 3107/3111 were stopped; only the current port3000 server is needed.
+
+## Completed behavior
+
+- Main journey: location → real nearby grocer selection → household/preferences → meals and grocery list. Google discovery is part of the flow, rather than a disconnected optional result widget.
+- Selected grocer appears in results, Maps directions, known retailer websites, supported ingredient searches and copy/download. Changing shops preserves existing meals and check-offs without another Gemini request. Location edits clear dependent store/meal state; stale responses are ignored.
+- Genuine retailer-wide ingredient searches for Walmart Canada, No Frills, Loblaws, Walmart US and Kroger. Unsupported stores receive an in-person list/directions; they never silently point to another retailer. Explicit regional shopping is a separate alternative.
+- Six original photorealistic, plant-based category images bundled in `public/meal-images/`, with deterministic recipe-category matching and visible AI-generated serving-inspiration labels. Created once using the built-in imagegen tool. No runtime image endpoint, external photo requests, Gemini image calls, billing changes or dependencies. Prompts and provenance: `docs/MEAL_IMAGES.md`.
+- Additive `StoreDiscoveryRequest.discoveryScope` accepts `all-grocers` or `major-chains`. Primary UI requests all-grocers, including independent stores with provider grocery/supermarket types. Country/radius/operational/business-type checks, attribution, deadlines and 20-candidate cap remain. Unknown stores keep null chain IDs and unavailable pricing. Omitted scope preserves legacy major-chain discovery and optimizer resolution.
+- Existing real Gemini 3.5 Flash-Lite generation, structured quantities, dietary safeguards, full regeneration and single swaps remain. Household/budget controls and reduced-motion behavior remain.
 
 ## Verification actually run
 
 November 8, 2026:
 
-- Final `npm run verify` passed: lint, strict typecheck, **706 tests passed / 6 opt-in tests skipped** (36 files), production build, **38 production HTTP smoke checks**.
-- Opt-in real Gemini integration test passed with the configured key. `node scripts/live-meal-check.mjs http://127.0.0.1:3111` passed Canadian CAD household, US USD household, vegetarian meals, distinct single-meal swap and country/currency rejection.
-- Production browser: St. Catharines `L2R 5L3`, 2 people, CAD $100; live generation, full structured recipe/instructions, exact overlapping totals (including oil/salt), one-meal swap preserving other meals, checked-item quantity invalidation, clipboard copy, and actual downloaded text file inspected.
-- Production browser: Buffalo `14201`, 2 people, USD $100, Vegetarian; all meals were vegetarian/vegan; full regeneration changed all three meals; single swap retained the other two and consolidated shared garlic, onion, salt and oil using the existing conventions. Actual Walmart US/Kroger URLs appeared.
-- Canadian Google lookup returned a real St. Catharines grocer/address/straight-line distance and official attribution. The final primary flow does not require this lookup or pricing coverage.
-- Native household slider responded to keyboard arrows. Effective mobile width was 375 CSS pixels with document scrollWidth also 375; results and shopping list were visually inspected. Viewport override reset afterward.
-- Final US browser warning/error log was empty. An earlier transient Gemini error was visible, and explicit retry succeeded. Provider success is not guaranteed.
-- Screenshot: ignored `artifacts/meal-plan-verified.jpg`. Download: `C:\Users\myste\Downloads\shopmate-groceries-ca.txt` (verification artifact, not committed).
-- `git diff --check` passed. `.env.local` is ignored; no credentials, build outputs or screenshots were staged.
+- Final `npm run verify` passed: lint, strict typecheck, **751 tests passed / 6 opt-in tests skipped** (39 files), production build, **46 production HTTP checks**. HTTP checks include all six bundled WebPs, Next.js image optimization and discovery-scope validation.
+- New scope tests cover CA/US independent grocers, excluded/closed/cross-border businesses, attribution, bounded requests, unknown scope rejection, unchanged omitted-scope behavior and unchanged optimizer store resolution.
+- New UI/helper/image tests cover store selection, supported country/chain search links, honest unsupported-store behavior, regional choice, country/location clearing, stale/cancelled responses, preserved meals on shop changes, export context, local assets and category matching.
+- Live Canadian browser: St. Catharines `L2R 5L3`, selected actual Farm Boy, 2 people, CAD100, three real vegetarian Gemini meals. Chosen store/address/directions carried into results and clipboard text; food photos loaded. Final all-grocer HTTP check returned **18 actual Canadian stores**, all Google-source/CA with unavailable prices.
+- Final live US browser: Buffalo `14201`, actual nearby grocers returned; selected Tops Friendly Markets, 2 people, USD100, three real vegetarian Gemini meals. Switched to another returned grocer without regenerating; meal names and check state persisted. Copy/download included that newly selected grocer, address and Maps directions. Checked broccoli was omitted. Downloaded text was read and inspected.
+- Explicit regional shopping then exposed real Walmart US/Kroger ingredient-search URLs; original meals remained. Restored the actual Tops selection for the final demo.
+- Mobile results/list visually inspected at effective **375 CSS pixels**, scrollWidth also375. Viewport override reset. Final browser warning/error log was empty. All three visible meal images decoded successfully and used local Next.js image URLs.
+- Screenshot: ignored `artifacts/connected-meal-demo.jpg`. Download: `C:\Users\myste\Downloads\shopmate-groceries-us.txt`, a verification artifact, not committed.
+- `git diff --check` passed. No credentials, build outputs, screenshots or downloaded lists were staged. Main and dependency/lockfiles were preserved.
 
-## Run and record now
+## Honest limits
 
-The final production build is running at **http://127.0.0.1:3111/plan**, agent exec session `46728`. It may end with the host session. Restart with:
+This is a working meal-to-shopping-list assistant, not checkout automation. No Instacart or Share-A-Cart API key/access is configured. No real cart, product/SKU matching, branch inventory, grocery price, savings, delivery eligibility or delivery slot is claimed. Retailer sites handle branch/address selection and fulfillment. The bounded nearest20 Google search can return only stores without a supported online search; in-person directions/list and explicit regional searches remain useful.
 
-```powershell
-npm start -- --hostname 127.0.0.1 --port 3111
-```
+Images represent category-level serving inspiration, not each exact generated recipe or allergy guarantees. Written ingredients and real product labels govern dietary suitability. Quantities with incompatible units/preparations remain separate; no density/count conversion is guessed. No persistent accounts/database/storage; copy/download preserves a usable list.
 
-The current browser has a real US vegetarian plan ready to inspect. Refresh clears plan/checklist state. See `DEMO_GUIDE.md` for a two-minute walkthrough, setup and repeatable checks. Preserve recording/submission time; no additional feature work is necessary for this focused demo.
-
-## Limits and missing permissions
-
-No Share-A-Cart application key or authenticated regional/vendor/product/cart verification is available. Real cart creation is **not implemented**. Public retailer searches work as shopping handoff; see `docs/SHARE_A_CART.md`.
-
-Budget is a recipe-generation intention, not a verified shopping total. No actual grocery prices, inventory, matched SKUs, delivery, savings or nutrition guarantees. Common dietary checks cannot establish product-label or cross-contact safety. Ingredients with genuinely incompatible units/preparations remain separate; no density/count conversion is guessed. No accounts/database or persistent meal storage. No deployment or merge to main was performed.
-
-Server secrets: `GEMINI_API_KEY` (or `GOOGLE_GENAI_API_KEY`); optional `GOOGLE_MAPS_API_KEY`. Key values stay local and server-side. Google public-launch terms/privacy/key-restriction requirements remain in docs/DEPLOYMENT.md. Retailer and Google availability remain external dependencies.
+Server-only settings remain local: `GEMINI_API_KEY` (or `GOOGLE_GENAI_API_KEY`) and `GOOGLE_MAPS_API_KEY`. Meal requests still consume normal Gemini text quota; image display/selection consumes zero image-generation calls. Public launch privacy/terms, Google restrictions and quota controls remain documented in docs/DEPLOYMENT.md. No deployment or main merge was performed.
