@@ -1,11 +1,10 @@
 "use client";
 
-import Image from "next/image";
 import { useState } from "react";
 import type { CoreOptimizationResult, PriceBasis, Ingredient, OptimizationResult, OptimizationResultV2, ProductPackage, Recipe, Store, StoreV2 } from "@/contracts";
 import { formatMoney } from "@/lib/format";
 import { safeExternalUrl } from "@/lib/planner";
-import { mealPhoto } from "@/lib/meal-photo";
+import { Icon, MealArt, recipeArtKind } from "@/components/grocery-art";
 import { Notices, SectionHeading } from "./planner-ui";
 
 interface ResultProps {
@@ -22,6 +21,7 @@ export function PlanResults(props: ResultProps) {
   if (result.status !== "feasible") return <>
     <SectionHeading title={result.status === "incomplete" ? "Search paused" : "No matching plan"} />
     <div className="empty-state">
+      <span className="state-icon"><Icon name={result.status === "incomplete" ? "bowl" : "basket"} /></span>
       <p>{result.message}</p>
       {result.status === "incomplete" && <p className="small-note">The search ended early. A plan may still be possible.</p>}
       {result.status === "infeasible" && result.minimumKnownCost && <p className="small-note">Lowest known cost: {formatMoney(result.minimumKnownCost)} · {result.pricingBasis === "verified" ? "verified quote" : "illustrative"}</p>}
@@ -63,11 +63,11 @@ function FeasiblePlan({ result, stores, recipes, ingredients, products, onEdit }
   }
 
   return <>
-    <SectionHeading title={view === "list" ? "Shopping list" : view === "nutrition" ? "Nutrition" : "Your plan"} />
+    <SectionHeading title={view === "list" ? "Shopping list" : view === "nutrition" ? "Nutrition" : view === "stores" ? "Compare stores" : "Your meals"} />
     {view !== "nutrition" && <p className="data-note">{result.pricingBasis === "verified" ? "Verified branch quotes · prices may change before checkout" : "Illustrative prices"}</p>}
     {(view === "meals" || view === "stores") && <div className="plan-cost">
-      <div className="cost-line"><strong>{formatMoney(result.total)}</strong><span>{formatMoney(result.budgetRemaining)} left</span></div>
-      <p>{storeName(result.recommendedStoreId)} · {result.meals.length} meals</p>
+    <div className="cost-line"><div><span className="cost-label">Basket total</span><strong>{formatMoney(result.total)}</strong></div><span className="budget-left">{formatMoney(result.budgetRemaining)} left</span></div>
+      <p>{storeName(result.recommendedStoreId)} · {result.meals.length} {result.meals.length === 1 ? "meal" : "meals"}</p>
       {recommendedOffers.length > 0 && <p className="small-note">{recommendedOffers[0]!.provenance.channel} · retrieved {new Date(Math.min(...recommendedOffers.map(offer => Date.parse(offer.provenance.retrievedAt)))).toLocaleString()} · excludes taxes, fees and deposits</p>}
     </div>}
     <nav className="result-nav" aria-label="Plan views">
@@ -79,7 +79,7 @@ function FeasiblePlan({ result, stores, recipes, ingredients, products, onEdit }
           const recipe = recipes.find(item => item.id === meal.recipeId);
           return <details className="meal-detail" key={meal.slot}>
             <summary>
-              {recipe && <Image className="meal-thumbnail" src={mealPhoto(recipe)} alt="" width={166} height={166} sizes="83px" />}
+              {recipe && <MealArt className="meal-thumbnail" kind={recipeArtKind(recipe)} />}
               <span className="meal-label"><small>Meal {meal.slot + 1}</small><h2>{recipe?.name ?? "Recipe unavailable"}</h2><span>{recipe ? `${recipe.totalMinutes} min · ` : ""}{meal.servings} servings</span></span>
             </summary>
             {recipe ? <div className="recipe-content">
@@ -91,13 +91,13 @@ function FeasiblePlan({ result, stores, recipes, ingredients, products, onEdit }
             </div> : <p className="small-note">Recipe details are missing from the current catalog.</p>}
           </details>;
         })}</div>
-        <p className="result-footnote">Photos are serving inspiration. Nutrition is estimated.</p>
+        <p className="result-footnote">Nutrition is estimated.</p>
       </>}
 
       {view === "stores" && <>
-        <p className="data-note">Same basket at each store. Purchases aren’t split.</p>
-        <div>{result.baskets.map(item => <article key={item.storeId} className="basket-row">
-          <header><h2>{storeName(item.storeId)}</h2>{item.status === "complete" && <strong>{formatMoney(item.total)}</strong>}</header>
+        <p className="data-note">One complete basket per store.</p>
+        <div>{result.baskets.map(item => <article key={item.storeId} className={`basket-row ${item.status === "complete" && item.storeId === result.recommendedStoreId ? "is-recommended" : ""}`}>
+          <header><h2><Icon name="basket" />{storeName(item.storeId)}</h2>{item.status === "complete" && <strong>{formatMoney(item.total)}</strong>}</header>
           {item.status === "complete" ? <>
             <p>{item.storeId === result.recommendedStoreId ? `Lowest complete basket · ${basisLabel.toLowerCase()}` : `Complete basket · ${basisLabel.toLowerCase()}`}</p>
             <button className="text-button" onClick={() => { setBasketStoreId(item.storeId); setCopyState(""); setView("list"); }}>View shopping list</button>
@@ -109,6 +109,7 @@ function FeasiblePlan({ result, stores, recipes, ingredients, products, onEdit }
       {view === "list" && <>
         <div className="list-toolbar"><label><span className="sr-only">Shopping list store</span><select value={basketStoreId} onChange={event => { setBasketStoreId(event.target.value); setCopyState(""); }}>{result.baskets.filter(item => item.status === "complete").map(item => <option key={item.storeId} value={item.storeId}>{storeName(item.storeId)}</option>)}</select></label><span aria-live="polite">{done}/{lines.length} done</span></div>
         <div className="list-tools"><button className="text-button" onClick={copyList}>Copy list</button><button className="text-button" onClick={() => window.print()}>Print</button><button className="text-button" aria-pressed={showUsage} onClick={() => setShowUsage(previous => !previous)}>Package details</button></div><p className="copy-status" role="status">{copyState}</p>
+        <div className="list-progress" role="progressbar" aria-label="Shopping list completion" aria-valuemin={0} aria-valuemax={lines.length || 1} aria-valuenow={done}><span style={{ width: `${lines.length ? done / lines.length * 100 : 0}%` }} /></div>
         {(["produce", "grains", "proteins", "dairy", "pantry", "other"] as const).map(category => {
           const group = lines.map((line, index) => ({ line, index })).filter(({ line }) => (ingredients.find(item => item.id === line.ingredientId)?.category ?? "other") === category);
           return group.length ? <div className="grocery-group" key={category}><h3>{category}</h3>{group.map(({ line, index }) => {
@@ -137,7 +138,7 @@ function FeasiblePlan({ result, stores, recipes, ingredients, products, onEdit }
         {result.ingredientReuse.length > 0 && <details className="disclosure reuse-list"><summary>Ingredient reuse</summary>{result.ingredientReuse.map(item => <p key={item.ingredientId}>{ingredientName(item.ingredientId)} · {item.recipeIds.length} recipes · {item.packagesAvoided} packages avoided · {formatMoney(item.estimatedSavings)} {basisLabel.toLowerCase()} savings versus separate meal purchases.</p>)}</details>}
       </>}
     </section>
-    {(view === "meals" || view === "stores") && <p className="result-footnote">{result.optimality === "best-found" ? "Best plan found. Search may be incomplete." : "Best plan within the searched catalog."}</p>}
+    {(view === "meals" || view === "stores") && <p className="result-footnote">{result.optimality === "best-found" ? "Best plan found. Search may be incomplete." : "Best within the searched recipes."}</p>}
     <Notices items={[...result.explanations, ...result.notices]} />
     <div className="flow-actions"><button className="button button-secondary" onClick={onEdit}>Edit preferences</button></div>
   </>;
