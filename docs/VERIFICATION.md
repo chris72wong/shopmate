@@ -32,3 +32,13 @@ Browser inspection covered wide/narrow landing and pantry layouts, no horizontal
 ## Country-first UI revision
 
 Re-ran `npm run verify` after replacing the marketing landing page with country selection and a validated postal/ZIP field: lint, strict types, all 63 tests, the production build, and all 13 HTTP smoke requests passed. Browser checks covered both countries, empty/invalid input, Canadian normalization, leading-zero ZIP codes, keyboard submission, focus on country changes, retained input within the flow, and correct CAD/USD demo navigation. Narrow layouts had no horizontal overflow. The recipe library starts collapsed and expands successfully. Live discovery remains unimplemented; continuing explicitly opens fictional demo stores. The postal code stays in component state and is not included in the demo URL or sent to a server.
+
+## Recovery review — November 7, 2026
+
+Reviewed the source UI, all three API routes, shared types/request schemas, discovery/pricing providers, optimizer interface, catalog assumptions, tests, HTTP smoke script, CI, and existing deployment documentation before changing documentation. The checkout was clean before review. No application source, dependencies, environment settings, or executable contract definitions were changed.
+
+Freshly ran `npm run verify` with Node 24.15.0 and npm 11.12.1. Lint, typecheck, all 63 tests in 4 files, production build, and 13 production HTTP smoke requests passed. The smoke script started and stopped its own temporary production server. These are foundation checks: the suite tests intentional 501 responses, not a functioning optimizer or live discovery.
+
+No new browser/accessibility inspection, dependency audit, credential inspection, or credentialed external-provider request was performed in this review. The earlier browser/audit statements above are historical. Public official service documentation was consulted for access requirements; this does not establish account permissions or working integrations.
+
+Findings and acceptance gates are in [PLAN.md](../PLAN.md); the current v1 contract and explicitly unimplemented verified-pricing proposal are in [API.md](API.md). Package/budget optimization, real-price coverage, freshness, and the complete browser journey still need implementation and their own tests.

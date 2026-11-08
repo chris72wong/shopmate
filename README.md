@@ -4,6 +4,8 @@
 
 This repository is the **shared foundation**, ready for independent frontend, store-discovery, and optimization worktrees. Start by choosing a country, then enter a validated postal or ZIP code to open the explicitly labeled demo stores. Recipes are available in a collapsed library. Shared contracts, API scaffolds, provider interfaces, and the curated catalog support later implementation. It does not yet search Google or optimize meals; demo stores do not use or retain the entered postal code.
 
+The November 7 recovery review is saved in [PLAN.md](PLAN.md): audited working/mocked/missing features, external access requirements, and a scoped hackathon delivery plan. [docs/API.md](docs/API.md) preserves the current v1 contract and separately proposes v2 for verified branch/product prices. V2 is documentation only; no application behavior changed. Parallel work/worktrees still require explicit user authorization.
+
 ## Run locally
 
 Use Node.js 24 LTS (the tested version is 24.15.0) and npm. Node 22.12+ on the 22.x line is also supported by the tooling.
