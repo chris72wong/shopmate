@@ -49,3 +49,5 @@ Installation reported eight moderate dependency advisories; a fresh production-o
 ## Review and integrate
 
 The deliverable is on `codex/demo-ready`; main was preserved. Inspect `git diff main...codex/demo-ready` and `git log main..codex/demo-ready`. After review, integrate with your normal merge workflow (for example, from a clean main checkout: `git merge --no-ff codex/demo-ready`). Nothing was automatically merged or deployed. Use `git rev-parse codex/demo-ready` for the final commit.
+
+The branch is local: automatic approval review rejected the GitHub push because it considers the existing origin an unverified destination. The exact failure and resume command are in AGENT_HANDOFF.md. No source was pushed and no remote final-commit confirmation is claimed.

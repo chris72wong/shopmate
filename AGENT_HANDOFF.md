@@ -4,7 +4,7 @@
 
 Deliver a distinctive, tested hackathon demo while preserving the existing design. Product: deterministic meal and whole-package grocery optimization, including single/mixed-store comparisons. See PRODUCT_DECISION.md.
 
-Development branch: `codex/demo-ready`, based on `8c2b06b`. Main is unchanged. Reliability milestone commit: `7db73f0`. Final documentation commit follows it; resolve the final branch tip with `git log -1 --oneline`.
+Development branch: `codex/demo-ready`, based on `8c2b06b`. Main is unchanged. Reliability milestone commit: `7db73f0`; verified demo documentation: `eaffceb`. This handoff's push-status commit follows them; resolve the final branch tip with `git log -1 --oneline`.
 
 ## Existing functionality
 
@@ -12,7 +12,9 @@ Five-step CA/US planner, sample catalog, dietary/exclusion filters, household sc
 
 ## Current priorities
 
-Implementation and verification are complete. Final delivery step: commit the morning documentation, push `codex/demo-ready` to existing origin and verify the remote hash. No further feature work is required for the chosen demonstration. Exact walkthrough and limitations: DEMO_GUIDE.md.
+Implementation, verification and local commits are complete. No further feature work is required for the chosen demonstration. Exact walkthrough and limitations: DEMO_GUIDE.md.
+
+Push did **not** succeed. Automatic approval review rejected `git push -u origin codex/demo-ready` twice, including after outgoing-file inspection and remote verification. Its stated reason: repository source/documentation would be transmitted to an unverified external destination, and specific authorization for the payload/destination could not be established. No network write occurred. Existing origin is `https://github.com/chris72wong/shopmate.git`; read-only `git ls-remote` confirmed its main is exactly baseline `8c2b06b683f440f1826e6888d349191ab02d9a68`, and no remote demo-ready branch was returned. No bypass was attempted. An explicit approval request for this exact push is pending. After approval or manually in your own terminal, run `git push -u origin codex/demo-ready`, then compare `git rev-parse HEAD` with `git ls-remote origin refs/heads/codex/demo-ready`. All local work is preserved.
 
 ## Completed reliability work
 
