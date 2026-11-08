@@ -1,40 +1,50 @@
-# ShopMate agent handoff
+# ShopMate rescue handoff
 
-## Objective and branch
+## Branch and verified implementation
 
-Deliver a distinctive, tested hackathon demo while preserving the existing design. Product: deterministic meal and whole-package grocery optimization, including single/mixed-store comparisons. See PRODUCT_DECISION.md.
+Development branch: `codex/meal-to-groceries`.
+Verified implementation commit: `c1b29ebd64ec8a5c8d608b53052c4adc6506f49c` (Build real Gemini meal-to-grocery workflow).
+A documentation-only delivery commit follows it. Resolve the exact final tip with `git log -1 --oneline`; the final chat reply also records it. Main was preserved. Existing origin: `https://github.com/chris72wong/shopmate.git`; connected GitHub metadata verified repository identity and push permission.
 
-Development branch: `codex/demo-ready`, based on `8c2b06b`. Main is unchanged. Reliability milestone commit: `7db73f0`; verified demo documentation: `eaffceb`. This handoff's push-status commit follows them; resolve the final branch tip with `git log -1 --oneline`.
+## What changed
 
-## Existing functionality
+- `/plan` is now a real meal-to-grocery flow instead of requiring unavailable retailer prices.
+- Server-side `gemini-3.5-flash-lite` generation with structured JSON, strict Zod parsing, household/count/dietary checks, sanitized errors, a 55-second deadline, no automatic billable retries, and no fictional fallback.
+- The configured `GEMINI_API_KEY` was verified with the real model. The schema sent to Google is a structural subset: the full Zod schema caused a real 400 invalid-argument response; projection fixed it. Full response validation remains in place.
+- Meals vary across regeneration. Single-meal swaps retain the other meals and send existing ingredient naming/measurement conventions. Stable local slot IDs preserve ingredient-use counts.
+- Deterministic ingredient aggregation preserves g/ml/each and dry/drained/edible/as-sold semantics. Check-offs are retained only when identity and required quantity still match. Copy/download omits checked groceries.
+- Genuine Walmart Canada, Walmart US and Kroger search URLs. No invented product/price/cart/stock claims. Optional actual Google nearby grocers with official logo/attributions.
+- Household slider with responsive people illustrations, budget-guidance slider, diets/allergens/protein, concise responsive UI, keyboard tabs and reduced motion. Exclude Ingredients is absent from the primary journey.
+- Legacy `/demo` and optimizer routes remain explicitly illustrative/evidence-gated, separate from the primary workflow. No root dependency or lockfile changes.
 
-Five-step CA/US planner, sample catalog, dietary/exclusion filters, household scaling, integer-cent budgets, consolidated package purchases, complete store comparisons, split purchases, recipes, nutrition estimates and shopping lists. Live Google and pricing adapters exist; current real-price coverage requires separate credentialed verification.
+## Verification actually run
 
-## Current priorities
+November 8, 2026:
 
-Implementation, verification and local commits are complete. No further feature work is required for the chosen demonstration. Exact walkthrough and limitations: DEMO_GUIDE.md.
+- Final `npm run verify` passed: lint, strict typecheck, **706 tests passed / 6 opt-in tests skipped** (36 files), production build, **38 production HTTP smoke checks**.
+- Opt-in real Gemini integration test passed with the configured key. `node scripts/live-meal-check.mjs http://127.0.0.1:3111` passed Canadian CAD household, US USD household, vegetarian meals, distinct single-meal swap and country/currency rejection.
+- Production browser: St. Catharines `L2R 5L3`, 2 people, CAD $100; live generation, full structured recipe/instructions, exact overlapping totals (including oil/salt), one-meal swap preserving other meals, checked-item quantity invalidation, clipboard copy, and actual downloaded text file inspected.
+- Production browser: Buffalo `14201`, 2 people, USD $100, Vegetarian; all meals were vegetarian/vegan; full regeneration changed all three meals; single swap retained the other two and consolidated shared garlic, onion, salt and oil using the existing conventions. Actual Walmart US/Kroger URLs appeared.
+- Canadian Google lookup returned a real St. Catharines grocer/address/straight-line distance and official attribution. The final primary flow does not require this lookup or pricing coverage.
+- Native household slider responded to keyboard arrows. Effective mobile width was 375 CSS pixels with document scrollWidth also 375; results and shopping list were visually inspected. Viewport override reset afterward.
+- Final US browser warning/error log was empty. An earlier transient Gemini error was visible, and explicit retry succeeded. Provider success is not guaranteed.
+- Screenshot: ignored `artifacts/meal-plan-verified.jpg`. Download: `C:\Users\myste\Downloads\shopmate-groceries-ca.txt` (verification artifact, not committed).
+- `git diff --check` passed. `.env.local` is ignored; no credentials, build outputs or screenshots were staged.
 
-**Updated user instruction: push the changes to the existing ShopMate origin.** This supersedes the earlier keep-local decision. The delivery branch is `codex/demo-ready`; main remains unchanged.
+## Run and record now
 
-Earlier push attempts were rejected twice by automatic approval review because it considered the GitHub destination unverified for transmitting repository source/documentation. No network write occurred and no bypass was attempted. Existing origin is `https://github.com/chris72wong/shopmate.git`; the earlier read-only check confirmed its main matched baseline `8c2b06b683f440f1826e6888d349191ab02d9a68` and returned no remote demo-ready branch. This is historical verification, not a request to retry.
+The final production build is running at **http://127.0.0.1:3111/plan**, agent exec session `46728`. It may end with the host session. Restart with:
 
-## Completed reliability work
+```powershell
+npm start -- --hostname 127.0.0.1 --port 3111
+```
 
-- Prevent optional ingredient-reuse comparison caps from crashing a valid optimized basket. Omit the unsupported savings claim with a notice, preserving the actual candidate-search proof.
-- Keep shopping-list checks attached to store/ingredient/product identity across all-store and individual-store filters.
-- Expand production HTTP checks for exact line sums, vegan/peanut constraints, household scaling and honest one-cent budget failure in both currencies.
-- Read-only optimizer audit found the reuse bug; its separate 500-case package brute-force comparison found no other cost mismatch.
+The current browser has a real US vegetarian plan ready to inspect. Refresh clears plan/checklist state. See `DEMO_GUIDE.md` for a two-minute walkthrough, setup and repeatable checks. Preserve recording/submission time; no additional feature work is necessary for this focused demo.
 
-## Environment and commands
+## Limits and missing permissions
 
-Node 24 recommended. `npm ci`, `npm run dev`; open `/demo`. No environment variables needed for the demo. Optional live settings are documented in `.env.example` and docs/PRICING.md; never commit values.
+No Share-A-Cart application key or authenticated regional/vendor/product/cart verification is available. Real cart creation is **not implemented**. Public retailer searches work as shopping handoff; see `docs/SHARE_A_CART.md`.
 
-Checks: `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`, `npm run test:smoke`, or all via `npm run verify`. Stop this checkout's dev/production server before building. `npm start -- --hostname 127.0.0.1 --port 3107` serves a built demo.
+Budget is a recipe-generation intention, not a verified shopping total. No actual grocery prices, inventory, matched SKUs, delivery, savings or nutrition guarantees. Common dietary checks cannot establish product-label or cross-contact safety. Ingredients with genuinely incompatible units/preparations remain separate; no density/count conversion is guessed. No accounts/database or persistent meal storage. No deployment or merge to main was performed.
 
-## Verification and blockers
-
-November 8: `npm run verify` passed: lint, strict types, 629 tests passed / 5 opt-in tests skipped (31 files), production build, 35 production HTTP checks. Focused regression run: 6 tests passed. Dependency installation succeeded after stopping the old ShopMate server on port 3107. Installation reported 8 moderate advisories; a separate production-only audit could not reach the audit endpoint, so no fresh production audit result is claimed. No product blocker identified. Prices remain illustrative in demo; nutrition is estimated. No deployment or merge into main is authorized.
-
-Production browser: CAD vegan/peanut-free five-meal plan (18.54 one store / 18.50 split), per-store checked-item retention, package details and successful copy; one-cent budget failure; US default and nutrition-priority plans; complete store comparisons. Narrow list inspection had no horizontal overflow (the browser reported an effective 300 CSS-pixel viewport despite a requested 390 override); override reset. Inspected browser warning/error log was empty. Keyboard-specific end-to-end coverage was not repeated; semantic control interactions and existing tests cover keyboard-capable native controls. Print dialog was not exercised. Production HTTP additionally verified USD 80 → USD 20 nutrition-priority reoptimization (37.48 → 14.04). Screenshot: ignored `artifacts/demo-comparison.jpg`.
-
-The production review server is running in the agent exec session on loopback port 3107. Stop it before rebuilding. It may end with the host session; otherwise use the launch commands above. Browser screenshots are verification artifacts, not Git deliverables. Shopping checks reset on new results/strategy; plan state is not persisted after refresh. Repeated meals are expected and documented.
+Server secrets: `GEMINI_API_KEY` (or `GOOGLE_GENAI_API_KEY`); optional `GOOGLE_MAPS_API_KEY`. Key values stay local and server-side. Google public-launch terms/privacy/key-restriction requirements remain in docs/DEPLOYMENT.md. Retailer and Google availability remain external dependencies.
