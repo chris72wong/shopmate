@@ -25,6 +25,7 @@ export class ReefPricingAdapter {
   constructor(private readonly options: ReefOptions = {}) { this.http = options.http ?? sharedHttp; }
   configured(): boolean { return Boolean((this.options.apiKey ?? process.env.REEF_KEY)?.trim()); }
   private async call(binding: BranchBinding, action: "search" | "stores", params: Record<string, string | number>) {
+    if (binding.providerId !== "reef-loblaws" && binding.providerId !== "reef-kroger") throw retailFailure();
     const apiKey = (this.options.apiKey ?? process.env.REEF_KEY)?.trim();
     if (!apiKey) throw retailUnavailable();
     const engine = binding.providerId === "reef-loblaws" ? "loblaws" : "kroger";

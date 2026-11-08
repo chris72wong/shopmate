@@ -65,8 +65,9 @@ describe("reviewed identity matching and promotions", () => {
     expect(branchBindingSchema.safeParse(binding).success).toBe(true); expect(productMappingSchema.safeParse(mapping).success).toBe(true);
     expect(branchBindingSchema.safeParse({ ...binding, country: "US" }).success).toBe(false);
     expect(productMappingSchema.safeParse({ ...mapping, usableQuantity: { quantity: 1000, unit: "g" } }).success).toBe(false);
-    const store = { id: "google:synthetic", name: "Synthetic store", address: "1 Synthetic Street, Test City, ON M5V 2T6", source: "google" as const, country: "CA" as const, chainId: null, pricing: { status: "unavailable" as const, profileId: null } };
+    const store = { id: "google:synthetic", name: "No Frills", address: "1 Synthetic Street, Test City, ON M5V 2T6", source: "google" as const, country: "CA" as const, chainId: null, pricing: { status: "unavailable" as const, profileId: null } };
     expect(bindingForStore(store, { bindings: [binding], mappings: [] })).toEqual(binding);
+    expect(bindingForStore({ ...store, name: "Loblaws" }, { bindings: [binding], mappings: [] })).toBeUndefined();
     expect(bindingForStore({ ...store, address: "99 Different Street, Other City, M5V 2T6" }, { bindings: [binding], mappings: [] })).toBeUndefined();
     expect(bindingForStore({ ...store, address: "11 Synthetic Street, Test City, ON M5V 2T6" }, { bindings: [binding], mappings: [] })).toBeUndefined();
   });

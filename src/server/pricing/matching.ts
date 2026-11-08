@@ -14,6 +14,11 @@ export function matchVerifiedOffer(observation: RetailProductObservation, mappin
   const preparation = ingredient.name.includes("(dry)") ? "dry" : ingredient.name.includes("drained") ? "drained" : ingredient.name.includes("edible") ? "edible" : ingredient.name.includes("(raw)") ? "raw" : null;
   if (preparation && mapping.preparation !== preparation) return null;
   if (mapping.netQuantity.unit !== mapping.usableQuantity.unit && mapping.preparation !== "drained") return null;
+  const name = canonicalName(observation.name);
+  // A reviewed SKU identity cannot change the meaning of the canonical ingredient.
+  if (ingredient.id === "chicken" && (!/\bchicken\b/.test(name) || !/\bbreast\b/.test(name)
+    || /\b(whole|thighs?|wings?|rotisserie|cooked|breaded|nuggets?|marinated)\b/.test(name))) return null;
+  if (ingredient.id === "oats" && (!/\bgluten free\b/.test(name) || !/\brolled oats\b/.test(name))) return null;
   const selected = eligiblePrice(observation, now);
   if (!selected || selected.price.currency !== (binding.country === "CA" ? "CAD" : "USD")) return null;
   return { basis: "verified", available: true, price: selected.price, observation,
