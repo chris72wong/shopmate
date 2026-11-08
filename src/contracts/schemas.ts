@@ -55,6 +55,7 @@ export const storeDiscoveryRequestSchema: z.ZodType<StoreDiscoveryRequest> = z.s
   mode: z.enum(["demo", "live"]),
   location: locationInputSchema,
   radiusKm: z.number().min(1).max(50).default(5),
+  discoveryScope: z.enum(["major-chains", "all-grocers"]).optional(),
 });
 export const optimizationRequestSchema: z.ZodType<OptimizationRequest> = z.strictObject({
   mode: z.enum(["demo", "live"]),

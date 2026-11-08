@@ -1,6 +1,6 @@
 .meal-app { max-width: 1120px; padding-bottom: 70px; }
 .meal-progress { margin: 18px 0 25px; }
-.meal-progress ol { display: grid; grid-template-columns: repeat(3, 1fr); list-style: none; padding: 0; margin: 0; gap: 12px; }
+.meal-progress ol { display: grid; grid-template-columns: repeat(4, 1fr); list-style: none; padding: 0; margin: 0; gap: 12px; }
 .meal-progress button { display: flex; align-items: center; gap: 12px; padding: 10px 0; border: 0; background: transparent; font-size: 13px; width: 100%; text-align: left; }
 .meal-progress button>span { display: grid; place-items: center; width: 34px; height: 34px; border: 1px solid #b7c3aa; border-radius: 50%; font-size: 11px; flex-shrink: 0; }
 .meal-progress button>span .icon { width: 16px; height: 16px; }
@@ -144,3 +144,52 @@
 @media (max-width: 800px) { .generated-meal-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .meal-screen { padding: 27px; } .meal-list-invitation { align-items: stretch; flex-direction: column; } }
 @media (max-width: 560px) { .meal-app { padding-bottom: 35px; } .meal-progress { margin-top: 5px; margin-bottom: 10px; } .meal-progress ol { gap: 8px; } .meal-progress button { font-size: 10px; gap: 7px; align-items: start; flex-direction: column; } .meal-progress button>span { width: 29px; height: 29px; font-size: 10px; } .meal-topline .meal-kicker { font-size: 8px; letter-spacing: .7px; } .meal-screen { padding: 22px 17px; border-radius: 16px; } .meal-screen-heading { margin-bottom: 23px; } .meal-screen-heading h1 { font-size: 31px; } .meal-screen-heading .meal-kicker { font-size: 8px; } .meal-location .country-options { gap: 8px; } .meal-location .country-option { padding: 14px 10px; font-size: 12px; gap: 7px; } .meal-location .country-flag { width: 32px; height: 23px; } .meal-location .country-check { display: none; } .meal-setup-grid { grid-template-columns: 1fr; gap: 13px; } .meal-control-card { padding: 20px; } .meal-people { height: 90px; } .meal-budget-amount { padding-top: 12px; padding-bottom: 20px; font-size: 43px; } .meal-diet-options { grid-template-columns: repeat(2, minmax(0, 1fr)); } .meal-diet-option { flex-direction: row; gap: 5px; padding: 20px 9px 15px; font-size: 10px; } .meal-diet-option .food-art { width: 40px; height: 40px; } .meal-diet-option small { font-size: 8px; } .meal-option-check { top: 5px; right: 5px; width: 16px; height: 16px; font-size: 12px; } .meal-count-control { gap: 9px; } .meal-count-control label { font-size: 12px; } .meal-count-control>span { width: 100%; text-align: right; } .generated-meal-grid { grid-template-columns: 1fr; } .generated-meal-art .meal-art { height: 130px; } .generated-meal h2 { font-size: 21px; } .meal-card-meta { font-size: 10px; } .meal-description { font-size: 12px; } .meal-recipe-details { font-size: 12px; } .meal-view-tabs button { padding: 12px 8px; font-size: 12px; flex: 1; gap: 6px; } .meal-shopping-row { padding: 15px 12px; flex-wrap: wrap; gap: 8px; } .meal-shopping-row>label { flex-basis: 100%; gap: 10px; } .meal-shopping-name strong { font-size: 12px; } .meal-shopping-name small { font-size: 9px; } .meal-shopping-quantity { font-size: 11px; } .meal-retailer-links { margin-left: 30px; padding: 0; } .meal-retailer-links summary { padding: 4px 0; } .meal-retailer-links>div { gap: 0; } .meal-retailer-links a { font-size: 11px; } .meal-loading { padding: 18px 14px; gap: 12px; flex-wrap: wrap; } .meal-loading>div { flex: 1; } .meal-loading .text-button { padding: 3px; min-height: 34px; } .meal-loading-bowl { width: 38px; height: 38px; } .meal-loading strong { font-size: 13px; } .meal-loading p { font-size: 10px; } .meal-list-invitation { padding: 18px; } .meal-shopping-top h2 { font-size: 22px; } }
 @media (prefers-reduced-motion: reduce) { .meal-app *, .meal-app *::before, .meal-app *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+.meal-store-intro { max-width: 650px; color: var(--muted); line-height: 1.7; font-size: 13px; }
+.meal-store-search { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin: 20px 0; font-size: 13px; }
+.meal-store-search label { font-weight: 650; }
+.meal-store-search select { min-height: 42px; border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; background: var(--cream); }
+.meal-store-origin { font-size: 13px; margin: 18px 0 12px; font-weight: 650; color: var(--forest); }
+.meal-store-options { display: grid; gap: 12px; }
+.meal-store-option { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 18px; border: 1px solid var(--line); border-radius: 13px; background: var(--cream); transition: border-color .15s, background .15s; }
+.meal-store-option.is-selected { background: #edf2e4; border-color: var(--forest); box-shadow: inset 0 0 0 .5px var(--forest); }
+.meal-store-option>label { display: flex; align-items: center; gap: 14px; cursor: pointer; flex: 1; min-width: 0; }
+.meal-store-option input { flex-shrink: 0; accent-color: var(--forest); width: 19px; height: 19px; }
+.meal-store-details { min-width: 0; display: grid; gap: 6px; }
+.meal-store-details strong { font-size: 16px; color: var(--forest); }
+.meal-store-details>span { font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.meal-store-details small { font-size: 10px; color: var(--muted); line-height: 1.5; }
+.meal-store-links { display: grid; gap: 2px; }
+.meal-store-links a { font-size: 11px; white-space: nowrap; padding: 10px 0; text-decoration: underline; text-underline-offset: 3px; }
+.meal-store-empty { background: #f4f5e9; border-radius: 12px; padding: 24px; margin: 15px 0; }
+.meal-store-empty h2 { font-size: 18px; color: var(--forest); font-weight: 750; }
+.meal-store-empty p { font-size: 13px; margin-top: 8px; line-height: 1.7; }
+.meal-store-notices { font-size: 11px; color: var(--muted); line-height: 1.7; margin-top: 16px; }
+.meal-store-notices summary { cursor: pointer; min-height: 32px; }
+.meal-regional-choice { margin-top: 16px; display: block; min-height: 44px; text-decoration: underline; text-underline-offset: 4px; }
+.meal-selected-shop { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px 22px; padding: 20px; border: 1px solid #d9dfcf; border-radius: 14px; background: #f3f5e9; margin: -5px 0 28px; }
+.meal-selected-shop h2 { color: var(--forest); font-size: 21px; font-weight: 750; letter-spacing: -.5px; margin-top: 7px; }
+.meal-selected-shop p { font-size: 12px; line-height: 1.7; margin-top: 7px; }
+.meal-selected-shop .small-note { font-size: 10px; max-width: 620px; }
+.meal-selected-shop-actions { display: grid; align-content: start; justify-items: end; gap: 4px; }
+.meal-selected-shop-actions .button { font-size: 11px; min-height: 40px; padding: 10px 13px; border-radius: 8px; }
+.meal-selected-shop-actions .text-button { font-size: 11px; min-height: 30px; padding: 5px 0; }
+.meal-selected-shop>.google-attribution { grid-column: 1 / -1; margin: 0; padding-top: 6px; }
+.meal-in-person-note { display: flex; align-items: start; gap: 14px; padding: 18px; background: #edf2e4; border-radius: 12px; margin-top: 16px; font-size: 12px; line-height: 1.8; }
+.meal-in-person-note>.icon { width: 26px; height: 26px; flex-shrink: 0; }
+.meal-in-person-note .text-button { font-size: inherit; text-decoration: underline; }
+.generated-meal-art { padding: 0; }
+.generated-meal-art .meal-serving-image { display: block; width: 100%; height: 190px; object-fit: cover; }
+.generated-meal-art .meal-card-number { border-radius: 5px; background: #fffdf2ed; padding: 5px 7px; top: 11px; left: 11px; color: var(--forest); }
+.generated-meal-art .meal-art-caption { padding: 6px 10px; background: #f6f4e9; color: #53604d; font-size: 8px; }
+@media (max-width: 560px) {
+  .meal-progress ol { gap: 5px; }
+  .meal-progress button { font-size: 9px; line-height: 1.4; }
+  .meal-store-option { padding: 15px 12px; flex-direction: column; align-items: stretch; gap: 7px; }
+  .meal-store-details strong { font-size: 15px; }
+  .meal-store-details>span { font-size: 11px; }
+  .meal-store-links { display: flex; gap: 18px; margin-left: 33px; }
+  .meal-selected-shop { grid-template-columns: 1fr; padding: 17px; }
+  .meal-selected-shop-actions { display: flex; align-items: center; justify-content: flex-start; flex-wrap: wrap; gap: 8px 14px; }
+  .meal-selected-shop h2 { font-size: 20px; }
+  .generated-meal-art .meal-serving-image { height: 210px; }
+}

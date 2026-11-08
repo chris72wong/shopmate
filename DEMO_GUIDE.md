@@ -1,51 +1,46 @@
-# ShopMate — two-minute demo
+# ShopMate — two-minute connected demo
 
-ShopMate turns personalized Gemini meals into one actionable grocery list. Its differentiator is deterministic ingredient consolidation plus single-meal swaps that immediately update the list. No fictional grocery facts are used in the main journey.
+ShopMate connects a real nearby grocer to personalized meals and one actionable grocery list. It consolidates ingredients, recalculates after individual meal swaps, and carries the chosen shop into directions, supported retailer searches and exported lists.
 
 ## Run
 
-Use Node 24 and the existing npm lockfile. The final review server is on http://127.0.0.1:3111/plan. If it has stopped:
+The final review app runs at http://localhost:3000/plan. If stopped, use Node 24 and:
 
 ```powershell
 npm ci
 npm run build
-npm start -- --hostname 127.0.0.1 --port 3111
+npm start -- --hostname 127.0.0.1 --port 3000
 ```
 
-For development use `npm run dev` and http://localhost:3000/plan. Stop this checkout's server before rebuilding.
-
-Configure server-only `GEMINI_API_KEY` in `.env.local`. The configured key was live-tested with `gemini-3.5-flash-lite`. Optional `GOOGLE_MAPS_API_KEY` enables nearby grocers using Geocoding and Places API (New). `GOOGLE_GENAI_API_KEY` is also accepted for Gemini. Never use a `NEXT_PUBLIC_` name or commit credentials. No Share-A-Cart credential is configured.
+Stop this checkout's server before rebuilding. Use `npm run dev` for development. Server-only `.env.local` settings: `GEMINI_API_KEY` (or `GOOGLE_GENAI_API_KEY`) for meals; `GOOGLE_MAPS_API_KEY` for Geocoding/Places. Existing configured keys remain local and ignored by Git. No image key or runtime image API is needed.
 
 ## Recording walkthrough
 
-1. **0:00–0:15:** Open `/plan`. Choose Canada; enter St. Catharines postal code `L2R 5L3`. Continue.
-2. **0:15–0:35:** Move the household slider and return it to 2. Leave the budget at CAD $100 and choose 3 meals. Select Vegetarian if desired. Explain that the budget guides ideas; actual grocery prices are unavailable.
-3. **0:35–0:55:** Create meals. These are live Gemini requests, so allow a few seconds. Show distinct meals and open one recipe's full-household ingredients and cooking instructions. Food art is explicitly an illustration.
-4. **0:55–1:15:** Swap one meal. The other two stay in place. Open Grocery list: overlapping ingredients combine and quantities update. Different measurement/preparation states remain separate rather than being converted by guesswork.
-5. **1:15–1:40:** Check off a pantry ingredient. Copy remaining, then download the `.txt`. Both omit checked groceries. Open Shop ingredient to show a genuine Walmart Canada search URL.
-6. **1:40–2:00:** Optionally find nearby grocers: actual Google store/address/distance and Maps attribution. Close with the value: meals, one usable list, and a shopping handoff without manually adding up recipes.
+1. **0:00–0:20 — Your location.** Choose Canada and enter St. Catharines `L2R 5L3`, or choose US and Buffalo `14201`. Find nearby grocers. Google performs the actual lookup; the default radius is 10 km.
+2. **0:20–0:35 — Your grocer.** Choose a returned store, noting its real address and straight-line distance. A store labeled Online ingredient searches supports retailer-wide searching. Other stores support an in-person list and directions. Continue with this store. If needed, try 25 km; the explicit regional-links option remains separate from a local store.
+3. **0:35–0:55 — Your table.** Move the household slider and return it to 2. Keep CAD/USD $100 and choose 3 meals. Select Vegetarian. Budget guides meal ideas, not a verified basket total. Create meals.
+4. **0:55–1:15 — Meals.** Show the appetizing bundled food imagery, labeled AI-generated serving inspiration. Open one recipe and show full-household quantities and instructions. Swap one meal to demonstrate the list recalculating while other recipes remain.
+5. **1:15–1:40 — Groceries.** Open Grocery list. Show combined ingredients, then check off a pantry ingredient. Copy or download remaining groceries; the export includes the selected store and directions. For a supported retailer, expand Shop ingredient to show that searches now target the chosen retailer.
+6. **1:40–2:00 — Shopping handoff.** Show Get directions and Visit retailer website where available. Change shop without regenerating meals. Close with the value: location, meals, one consolidated list and a practical shopping handoff.
 
-For a US recording choose United States and Buffalo ZIP `14201`; the budget is USD and searches target Walmart US/Kroger. Test generation before recording. If the provider returns a temporary error, use the visible retry; no sample meals are silently substituted.
+Prepare a plan before recording to avoid provider latency. Store results and meal names change; no branch or recipe is hardcoded. If discovery fails, show the error and use the explicitly labeled regional shopping option. If Gemini fails, use visible retry; no sample meals replace a failed request.
 
-## Verified behavior and honest boundaries
+## Data and access honesty
 
-- Live Gemini: Canadian CAD and US USD households, vegetarian generation and a distinct single-meal replacement passed through the built app. An opt-in direct integration test also passed.
-- Browser: Canadian generation, recipes, swap preserving other meals, ingredient totals, check-offs, successful clipboard and real downloaded text. Mobile list had no horizontal overflow at the browser's effective 375 CSS-pixel width. Canadian Google discovery returned an actual St. Catharines grocer with official attribution.
-- Retailer search routes: Walmart Canada, Walmart US and Kroger. These are searches, not matched product links or carts. See docs/SHARE_A_CART.md.
-- `npm run verify`: lint, strict types, 706 passing tests (6 opt-in tests skipped), production build and 38 production HTTP smoke checks.
-- Recipes are AI-generated suggestions. Common dietary conflicts are rejected, but brand ingredients/cross-contact and cooking correctness require user review. No nutrition guarantees, observed grocery prices, savings, inventory, delivery, package purchase totals or checkout carts are claimed.
-- There is no Share-A-Cart integration: application authentication and regional retailer search/cart access remain unavailable/unverified. No real cart was created.
-- Meal/checklist state is in browser memory and resets on refresh. Copy/download preserves a usable list. The legacy `/demo` is separately labeled fictional/illustrative and is not used by the main workflow.
+- Google returns actual grocery stores, including independents in the main flow, with official Maps attribution. Country, radius, business type, operational status and candidate limits are enforced. This is a bounded search, not every store nearby. Store results stay in memory and clear on location edits.
+- Gemini generates original structured recipe suggestions. Country, household, budget intention, diet and allergens affect the request. The selected store does not imply known inventory. Written ingredients and actual product labels are authoritative.
+- Six original category images were generated once using the built-in imagegen tool and bundled locally. Viewing, generating or swapping meals makes zero image-generation API calls and uses no Gemini image quota. The images are serving inspiration, not exact recipe photographs. Prompts/provenance: docs/MEAL_IMAGES.md.
+- Verified public ingredient-search routes: Walmart Canada, No Frills, Loblaws, Walmart US and Kroger. They are retailer-wide searches, not branch-bound stock checks or prefilled checkout carts. Retailers handle branch/address selection, product suitability and fulfillment.
+- Unsupported online grocers retain an in-person list and exact-place directions. They never silently link to another retailer. Choosing regional shopping is an explicit alternative.
+- There is no Instacart/Share-A-Cart API integration or verified delivery/cart creation. Separate approved access is still required. No grocery prices, savings, product matches, stock or delivery eligibility are invented.
+- Meal/checklist state resets on refresh. Copy/download preserves a usable list. The separately labeled legacy `/demo` is not the primary product.
 
-## Re-run checks
+## Repeat checks
 
 ```powershell
 npm run verify
-# With the production server running: four real Gemini calls plus currency validation
-node scripts/live-meal-check.mjs http://127.0.0.1:3111
-# Optional single real-model test; may incur normal provider charges
-$env:SHOPMATE_RUN_GEMINI_LIVE='1'
-node --env-file=.env.local node_modules/vitest/vitest.mjs run tests/meal-live.test.ts
+# Optional: with the server running, four real Gemini requests plus currency validation
+node scripts/live-meal-check.mjs http://127.0.0.1:3000
 ```
 
-The default suite and HTTP smoke checks make no live Gemini calls. Provider failure, malformed/truncated output, dietary conflicts, stale/cancelled responses, currency mismatches and missing-key behavior have automated coverage. Browser observation included a temporary provider error followed by successful retry; generation availability depends on Google.
+The default suite and HTTP smoke make no live Gemini requests. The full verification result and latest browser observations are in AGENT_HANDOFF.md. Avoid repeated live generations while on a free API tier; bundled imagery adds no image API usage.

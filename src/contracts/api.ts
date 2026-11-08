@@ -9,6 +9,8 @@ export interface StoreDiscoveryRequest {
   mode: DataMode;
   location: LocationInput;
   radiusKm: number;
+  /** Defaults to the legacy major-chain scope when omitted. */
+  discoveryScope?: "major-chains" | "all-grocers";
 }
 export interface StoreDiscoveryResult {
   mode: DataMode;

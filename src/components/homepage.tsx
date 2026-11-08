@@ -3,7 +3,7 @@ import { Icon } from "@/components/grocery-art";
 import { AnimatedGroceries } from "@/components/animated-groceries";
 
 const howItWorks = [
-  { icon: "bowl", title: "Make it yours", copy: "Fresh meal ideas for your table.", colour: "sage" },
+  { icon: "pin", title: "Find your grocer", copy: "Start with a store near you.", colour: "sage" },
   { icon: "list", title: "One clever grocery list", copy: "Shared ingredients, added up for you.", colour: "apricot" },
   { icon: "basket", title: "Ready for your next shop", copy: "Check, copy, download and search.", colour: "butter" },
 ] as const;
@@ -13,7 +13,7 @@ export function Homepage() {
     <section className="hero page-width" aria-labelledby="hero-title">
       <div className="hero-copy">
         <h1 id="hero-title">Good food.<br /><span>Less fuss.</span></h1>
-        <p className="hero-description">Fresh meal ideas. One grocery list. A little less on your plate.</p>
+        <p className="hero-description">Your local grocer. Fresh meal ideas. One ready-to-shop list.</p>
         <Link href="/plan" className="button button-primary">Start planning <Icon name="arrow" /></Link>
       </div>
       <AnimatedGroceries />

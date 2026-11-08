@@ -58,11 +58,11 @@ function publicUri(value: string, mapsOnly = false): string {
   return uri.href;
 }
 function countryOf(place: Place): string | undefined { return place.addressComponents.find(item => item.types.includes("country"))?.shortText; }
-function validGrocery(place: Place, country: Country): boolean {
+function validGrocery(place: Place, country: Country, includeIndependent = false): boolean {
   return countryOf(place) === country && place.types.some(type => groceryTypes.has(type))
     && !excludedPrimaryTypes.has(place.primaryType ?? "")
     && (Boolean(place.primaryType) || !place.types.some(type => excludedPrimaryTypes.has(type)))
-    && matchGroceryBanner(place.displayName.text, country) !== null
+    && (includeIndependent || matchGroceryBanner(place.displayName.text, country) !== null)
     && (!place.businessStatus || place.businessStatus === "OPERATIONAL");
 }
 function identity(place: Place, country: Country): ResolvedStore {
@@ -130,12 +130,12 @@ export function createGoogleStoreDiscovery(options: GoogleOptions = {}): StoreDi
         const parsed = placeSchema.safeParse(raw);
         if (!parsed.success) throw providerError();
         const place = parsed.data;
-        if (!validGrocery(place, request.location.country)) continue;
+        if (!validGrocery(place, request.location.country, request.discoveryScope === "all-grocers")) continue;
         const distance = distanceMeters(coordinates, place.location);
         if (distance > request.radiusKm * 1000 || placeIds.has(place.id)) continue;
         placeIds.add(place.id);
         const base = identity(place, request.location.country);
-        candidates.push({ bannerId: matchGroceryBanner(place.displayName.text, request.location.country)!.id, place,
+        candidates.push({ bannerId: matchGroceryBanner(place.displayName.text, request.location.country)?.id ?? `place:${place.id}`, place,
           store: { ...base, source: "google", googlePlaceId: place.id, coordinates: place.location, distanceMeters: distance, googleMapsUri: publicUri(place.googleMapsUri, true) } });
       }
       candidates.sort((a, b) => a.store.distanceMeters - b.store.distanceMeters || a.store.id.localeCompare(b.store.id, "en"));
@@ -152,9 +152,9 @@ export function createGoogleStoreDiscovery(options: GoogleOptions = {}): StoreDi
       }
       return { mode: "live", location: { ...request.location, currency: currencyForCountry(request.location.country) },
         origin: { label: origin.formatted_address, coordinates }, radiusKm: request.radiusKm, stores,
-        attributions: [...attributions.values()], notices: ["Major grocery chains · nearest location per banner.",
-          "Only the nearest returned branch of each eligible banner is shown from up to 20 Google candidates. This bounded search does not establish every nearby chain or branch.",
-          ...(stores.length ? [] : ["No eligible major grocery chains were returned in this search. Try a wider radius or another location; other stores may exist nearby."]),
+        attributions: [...attributions.values()], notices: [request.discoveryScope === "all-grocers" ? "Nearby grocery stores, including independent grocers. Known chains show one nearest returned branch." : "Major grocery chains · nearest location per banner.",
+          request.discoveryScope === "all-grocers" ? "Results are selected from up to 20 Google candidates. This bounded search does not establish every nearby store or branch." : "Only the nearest returned branch of each eligible banner is shown from up to 20 Google candidates. This bounded search does not establish every nearby chain or branch.",
+          ...(stores.length ? [] : [request.discoveryScope === "all-grocers" ? "No grocery stores were returned in this search. Try a wider radius or another location." : "No eligible major grocery chains were returned in this search. Try a wider radius or another location; other stores may exist nearby."]),
           "Store names, addresses and locations are provided by Google Maps. Distances are straight-line, not driving distances.",
           "Store discovery does not supply product prices. Request verified pricing separately; sample optimization is available only in explicit demo mode."] };
     },

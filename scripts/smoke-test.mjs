@@ -46,7 +46,7 @@ try {
   const home = await (await get("/")).text();
   assert(home.includes("Good food."));
   assert(home.includes('href="/plan"'), "The homepage must link to the planner");
-  assert(home.includes("Make it yours") && home.includes("One clever grocery list") && home.includes("Ready for your next shop"));
+  assert(home.includes("Find your grocer") && home.includes("One clever grocery list") && home.includes("Ready for your next shop"));
   assert(!home.includes("Recipes within your budget"), "No unevidenced budget guarantee");
   assert(!home.includes("/photos/") && !home.includes("Photo credits"), "Replaced stock photos must not return");
   const planner = await (await get("/plan")).text();
@@ -54,6 +54,14 @@ try {
   assert(planner.includes("Canada")); assert(planner.includes("United States"));
   assert(planner.includes("Where’s your kitchen?") || planner.includes("Where&#x27;s your kitchen?"));
   assert(!planner.includes("fictional stores"), "The primary planner cannot load fictional retailer data");
+  assert(planner.includes("Your grocer"), "Store choice belongs in the main journey");
+  for (const category of ["pasta", "curry", "bowl", "stew", "tacos", "breakfast"]) {
+    const photo = await get(`/meal-images/${category}.webp`);
+    assert(photo.headers.get("Content-Type")?.includes("image/webp"));
+    assert((await photo.arrayBuffer()).byteLength > 1000, "Bundled food image must contain actual image data");
+  }
+  const optimizedPhoto = await get("/_next/image?url=%2Fmeal-images%2Fpasta.webp&w=640&q=75");
+  assert(optimizedPhoto.headers.get("Content-Type")?.startsWith("image/"), "Next.js must serve the meal image");
   const cssPath = home.match(/href="([^"]+\.css(?:\?[^"]*)?)"/)?.[1];
   assert(cssPath, "The home page must load generated CSS");
   const css = await (await get(cssPath.replaceAll("&amp;", "&"))).text();
@@ -74,7 +82,8 @@ try {
   assert(!("data" in noGemini), "Unavailable Gemini cannot return substitute meals");
   await post("/api/meals", { ...mealInput, budget: { amountCents: 10000, currency: "USD" } }, 422);
   await post("/api/meals", { ...mealInput, householdSize: 9 }, 422);
-  await post("/api/stores", { mode: "live", location: { country: "US", postalCode: "14201" } }, 503);
+  await post("/api/stores", { mode: "live", location: { country: "US", postalCode: "14201" }, discoveryScope: "all-grocers" }, 503);
+  await post("/api/stores", { mode: "live", location: { country: "US", postalCode: "14201" }, discoveryScope: "unsupported" }, 422);
   await post("/api/stores", { mode: "demo", location: { country: "CA", postalCode: "invalid" } }, 422);
   const malformed = await fetch(origin + "/api/stores", { method: "POST", body: "{", signal: AbortSignal.timeout(5000) });
   assert.equal(malformed.status, 400); checks++;

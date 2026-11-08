@@ -2,7 +2,7 @@
 
 **Good food. Less fuss.** AI meal ideas turned into a practical grocery list for UB Hacking 2026.
 
-ShopMate uses **Gemini 3.5 Flash-Lite** to generate original, structured meals for your household and dietary preferences. It combines shared ingredients with deterministic quantity arithmetic, lets you swap individual meals, tracks what you already have, and exports a consolidated grocery list with genuine Canadian or US retailer search links. Optional Google Maps discovery finds actual nearby grocers.
+ShopMate connects your location to actual nearby grocers through Google Maps, then uses **Gemini 3.5 Flash-Lite** to generate structured meals for your household and dietary preferences. Shared ingredients combine into one checklist. Your chosen grocer carries through to supported retailer searches, exact-place directions and copied/downloaded lists. Changing shops preserves the meals; changing location clears dependent state.
 
 For the hackathon walkthrough and verification limits, read [DEMO_GUIDE.md](DEMO_GUIDE.md). [PRODUCT_DECISION.md](PRODUCT_DECISION.md) explains the focused product and [AGENT_HANDOFF.md](AGENT_HANDOFF.md) records actual checks and branch handoff.
 
@@ -19,7 +19,7 @@ npm run dev
 
 Set server-only `GEMINI_API_KEY` in `.env.local`, then open [localhost:3000](http://localhost:3000). The primary planner is `/plan`. Stop the dev server with Ctrl+C before production verification. Missing or rejected credentials produce an explicit error; there is no sample fallback.
 
-The planner includes a household slider with animated figures, a CAD/USD budget-guidance slider, dietary choices, single-meal swaps, a checkable list and copy/download. Budget guides recipe ideas; actual prices, product matches, stock, checkout carts and delivery are unavailable. Food visuals are original illustrations, not recipe photographs. Share-A-Cart requires an unavailable application credential; see [the brief investigation](docs/SHARE_A_CART.md).
+The planner includes a household slider, CAD/USD budget guidance, dietary choices, single-meal swaps and a checkable shopping list. Six bundled photorealistic images provide **AI-generated serving inspiration**, with no runtime image-generation calls or Gemini image quota usage. [Image provenance and prompts](docs/MEAL_IMAGES.md). Budget guides ideas; grocery prices, stock, carts and delivery eligibility are unavailable. Supported online searches are retailer-wide; confirm your branch and fulfillment on the retailer website. Other grocers get an in-person list and directions. Discovery failures offer explicit regional searches without fictional fallback. Share-A-Cart/Instacart require separate access and are not connected.
 
 For live configuration, create `.env.local` only if it does not already exist:
 

@@ -8,6 +8,10 @@ ShopMate's differentiator is the continuously recalculated shopping list: merge 
 
 Share-A-Cart requires an application credential or interactive approval unavailable in this checkout. Authenticated retailer support and Canadian cart capability remain unverified. Ship honest search links. See [the investigation](docs/SHARE_A_CART.md).
 
-Google discovery stays optional and separate. Legacy `/demo` and v1/v2 optimizer APIs remain explicitly illustrative or evidence-gated, and are not the main journey. No new backend, dependency, pricing-feed speculation or broad architecture rewrite is needed.
+The main journey now connects location → actual nearby grocer selection → household/preferences → meals and one shopping list. The selected store carries through to directions, supported retailer ingredient searches, and copied/downloaded lists. Online searches are retailer-wide, not branch inventory. Unsupported stores receive an in-person list and directions. Regional retailer links require an explicit alternative choice, including after a discovery failure; they never masquerade as nearby stores.
+
+Six reusable photorealistic food images are generated once and bundled as local assets. They are category-level AI-generated serving inspiration, not photos of the exact recipes. Viewing, generating and swapping meals makes no runtime image-generation calls and consumes no Gemini image quota.
+
+Legacy `/demo` and v1/v2 optimizer APIs remain explicitly illustrative or evidence-gated, and are not the main journey. No new backend, dependency, pricing-feed speculation or broad architecture rewrite is needed.
 
 Credentialed Gemini verification requires server-side `GEMINI_API_KEY`; absence must produce an explicit error with no sample fallback. See [the handoff](AGENT_HANDOFF.md) for actual checks and remaining limits.

@@ -1,5 +1,6 @@
-import type { Country } from "@/contracts";
+import type { Country, Store } from "@/contracts";
 import type { GeneratedMeal, MealIngredient } from "@/contracts/meal-plan";
+import { storeDirectionsLink } from "@/lib/store-shopping";
 
 export interface ShoppingItem {
   key: string;
@@ -75,9 +76,14 @@ export function retailerSearchLinks(country: Country, ingredientName: string): {
   ];
 }
 
-export function shoppingListText(meals: GeneratedMeal[], items: ShoppingItem[], country: Country): string {
+export function shoppingListText(meals: GeneratedMeal[], items: ShoppingItem[], country: Country, store?: Store | null): string {
   const number = new Intl.NumberFormat("en", { maximumFractionDigits: 6 });
-  const lines = ["SHOPMATE — GROCERY LIST", country === "CA" ? "Canada · CAD" : "United States · USD", "", "Meals"];
+  const lines = ["SHOPMATE — GROCERY LIST", country === "CA" ? "Canada · CAD" : "United States · USD"];
+  if (store?.source === "google" && store.country === country) {
+    lines.push("", `Selected grocer: ${store.name}`, store.address, `Directions: ${storeDirectionsLink(store)}`,
+      "Store information: Google Maps. Check the retailer for stock, prices and pickup/delivery options.");
+  }
+  lines.push("", "Meals");
   for (const meal of meals) lines.push(`• ${meal.name} (${meal.servings} ${meal.servings === 1 ? "serving" : "servings"})`);
   for (const category of categoryOrder) {
     const categoryItems = items.filter(item => item.category === category);
