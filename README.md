@@ -4,6 +4,8 @@
 
 ShopMate discovers eligible major grocery chains in Canada and the US, automatically selects the three closest returned banners, and plans meals with whole-package costs, dietary constraints, recipes and shopping lists. The illustrated planner supports both single-store comparisons and complete purchases split across selected stores. The explicit demo works without credentials using fictional stores and illustrative prices.
 
+For the tested hackathon walkthrough, exact expected totals and limitations, read [DEMO_GUIDE.md](DEMO_GUIDE.md). [PRODUCT_DECISION.md](PRODUCT_DECISION.md) explains the focused product and [AGENT_HANDOFF.md](AGENT_HANDOFF.md) records the latest verification and branch handoff.
+
 The historical recovery review is saved in [PLAN.md](PLAN.md). [docs/API.md](docs/API.md) documents the implemented v1 and v2 routes; [docs/INTEGRATION.md](docs/INTEGRATION.md) records local merges and verification. Live pricing requires authorized retailer access and reviewed ingredient/package mappings. Unsupported stores and missing prices remain unavailable; successful discovery does not establish price coverage.
 
 ## Run locally

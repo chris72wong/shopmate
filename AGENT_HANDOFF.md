@@ -4,7 +4,7 @@
 
 Deliver a distinctive, tested hackathon demo while preserving the existing design. Product: deterministic meal and whole-package grocery optimization, including single/mixed-store comparisons. See PRODUCT_DECISION.md.
 
-Development branch: `codex/demo-ready`, based on `8c2b06b`. Main is unchanged. Latest milestone: reliability fixes and full automated verification complete. Resolve the final branch tip with `git log -1 --oneline`.
+Development branch: `codex/demo-ready`, based on `8c2b06b`. Main is unchanged. Reliability milestone commit: `7db73f0`. Final documentation commit follows it; resolve the final branch tip with `git log -1 --oneline`.
 
 ## Existing functionality
 
@@ -12,8 +12,7 @@ Five-step CA/US planner, sample catalog, dietary/exclusion filters, household sc
 
 ## Current priorities
 
-1. Verify production browser journey and interactive results.
-2. Complete DEMO_GUIDE.md, commit and push branch; verify remote hash.
+Implementation and verification are complete. Final delivery step: commit the morning documentation, push `codex/demo-ready` to existing origin and verify the remote hash. No further feature work is required for the chosen demonstration. Exact walkthrough and limitations: DEMO_GUIDE.md.
 
 ## Completed reliability work
 
@@ -31,3 +30,7 @@ Checks: `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`, `npm r
 ## Verification and blockers
 
 November 8: `npm run verify` passed: lint, strict types, 629 tests passed / 5 opt-in tests skipped (31 files), production build, 35 production HTTP checks. Focused regression run: 6 tests passed. Dependency installation succeeded after stopping the old ShopMate server on port 3107. Installation reported 8 moderate advisories; a separate production-only audit could not reach the audit endpoint, so no fresh production audit result is claimed. No product blocker identified. Prices remain illustrative in demo; nutrition is estimated. No deployment or merge into main is authorized.
+
+Production browser: CAD vegan/peanut-free five-meal plan (18.54 one store / 18.50 split), per-store checked-item retention, package details and successful copy; one-cent budget failure; US default and nutrition-priority plans; complete store comparisons. Narrow list inspection had no horizontal overflow (the browser reported an effective 300 CSS-pixel viewport despite a requested 390 override); override reset. Inspected browser warning/error log was empty. Keyboard-specific end-to-end coverage was not repeated; semantic control interactions and existing tests cover keyboard-capable native controls. Print dialog was not exercised. Production HTTP additionally verified USD 80 → USD 20 nutrition-priority reoptimization (37.48 → 14.04). Screenshot: ignored `artifacts/demo-comparison.jpg`.
+
+The production review server is running in the agent exec session on loopback port 3107. Stop it before rebuilding. It may end with the host session; otherwise use the launch commands above. Browser screenshots are verification artifacts, not Git deliverables. Shopping checks reset on new results/strategy; plan state is not persisted after refresh. Repeated meals are expected and documented.
