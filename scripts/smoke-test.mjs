@@ -12,7 +12,7 @@ const port = address.port;
 await new Promise((resolve, reject) => probe.close((error) => error ? reject(error) : resolve()));
 const origin = `http://127.0.0.1:${port}`;
 const server = spawn(process.execPath, ["node_modules/next/dist/bin/next", "start", "--hostname", "127.0.0.1", "--port", String(port)], {
-  cwd: process.cwd(), env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1", GOOGLE_MAPS_API_KEY: "", REEF_KEY: "", SHOPMATE_PRICING_STORES: "[]", SHOPMATE_PRICING_PRODUCTS: "[]" }, stdio: ["ignore", "pipe", "pipe"], windowsHide: true,
+  cwd: process.cwd(), env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1", GOOGLE_MAPS_API_KEY: "", REEF_KEY: "", KROGER_CLIENT_ID: "", KROGER_CLIENT_SECRET: "", SHOPMATE_PRICING_STORES: "[]", SHOPMATE_PRICING_PRODUCTS: "[]" }, stdio: ["ignore", "pipe", "pipe"], windowsHide: true,
 });
 let output = "";
 let spawnError;
@@ -91,6 +91,12 @@ try {
     assert.equal(result.data.status, "feasible"); assert.equal(result.data.pricingBasis, "illustrative");
     assert.equal(result.data.catalogVersion, catalog.catalogVersion); assert(result.data.optimizerVersion);
     assert(result.data.total.amountCents <= 8000); assert(result.data.search.candidateRecipeIds.length);
+    assert.deepEqual(discovery.data.selectedStoreIds, input.storeIds);
+    assert(result.data.mixedStorePlan.total.amountCents <= 8000);
+    const automatic = await post("/api/v2/plan", { mode: "demo", location: { country, postalCode: country === "CA" ? "M5V 2T6" : "02108" }, catalogVersion: catalog.catalogVersion,
+      preferences: { weeklyBudget: { amountCents: 8000, currency: country === "CA" ? "CAD" : "USD" }, mealCount: 2, servingsPerMeal: 2, dietaryRestrictions: [], excludedIngredientIds: [], excludedAllergens: [], nutritionPriorities: [], objective: "balanced" } }, 200);
+    assert.equal(automatic.data.status, "planned"); assert.equal(automatic.data.selectedStoreIds.length, 3);
+    assert.equal(automatic.data.optimization.pricingBasis, "illustrative");
     await post("/api/v2/pricing", { ...input, catalogVersion: "old-catalog" }, 422);
   }
   await get("/api/v2/catalog?country=CA&country=US", 422);

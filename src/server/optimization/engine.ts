@@ -1,6 +1,6 @@
 import "server-only";
 import { currencyForCountry, optimizationRequestSchema, type BasketLine, type CoreOptimizationResult, type RepricedBasket, type PriceBasis,
-  type Ingredient, type IngredientRequirement, type IngredientReuse, type Nutrition, type OptimizationRequest,
+  type Ingredient, type IngredientRequirement, type IngredientReuse, type MixedStorePlan, type Nutrition, type OptimizationRequest,
   type OptimizationResult, type ProductPackage, type Recipe } from "@/contracts";
 import { ingredients as catalogIngredients } from "@/data/ingredients";
 import { recipes as catalogRecipes } from "@/data/recipes";
@@ -8,14 +8,14 @@ import { products as catalogProducts } from "@/data/pricing";
 import type { ResolvedStore } from "@/server/discovery/provider";
 import type { GroceryPricingProvider } from "@/server/pricing/provider";
 import { invalidRequest } from "@/server/errors";
-import { purchasePackages, quantityValue, type PricedPackage } from "@/server/optimization/packages";
+import { PackageSearchLimitError, purchasePackages, quantityValue, type PricedPackage } from "@/server/optimization/packages";
 
 export interface OptimizationEngine {
   optimize(request: OptimizationRequest, stores: readonly ResolvedStore[], pricing: GroceryPricingProvider): Promise<OptimizationResult>;
 }
-export const OPTIMIZER_VERSION = "catalog-multiset-1";
+export const OPTIMIZER_VERSION = "catalog-multiset-2";
 export const DEFAULT_EVALUATION_LIMIT = 20_000;
-export interface EngineOptions { ingredients?: readonly Ingredient[]; recipes?: readonly Recipe[]; products?: readonly ProductPackage[]; evaluationLimit?: number; onCandidates?: (ids: string[]) => void }
+export interface EngineOptions { ingredients?: readonly Ingredient[]; recipes?: readonly Recipe[]; products?: readonly ProductPackage[]; evaluationLimit?: number; onCandidates?: (ids: string[]) => void; onMixedPlan?: (plan: MixedStorePlan | null) => void }
 export interface PackageSnapshot { storeId: string; packages: PricedPackage[]; unavailable?: string }
 type CompleteBasket<B extends PriceBasis> = Extract<RepricedBasket<B>, { status: "complete" }>;
 const moneyTotal = (lines: readonly BasketLine[]): number => lines.reduce((sum, line) => sum + line.subtotal.amountCents, 0);
@@ -127,9 +127,14 @@ export function createPackageOptimizer<B extends PriceBasis>(basis: B, options: 
       packagesByStore.set(store.id, byIngredient);
     });
     const packageCache = new Map<string, BasketLine[] | null>();
+    let packageSearchTruncated = false;
+    function exactPurchase(item: IngredientRequirement, packages: PricedPackage[]) {
+      try { return purchasePackages(item.ingredientId, item, packages, currency); }
+      catch (error) { if (!(error instanceof PackageSearchLimitError)) throw error; packageSearchTruncated = true; return null; }
+    }
     function purchase(storeId: string, item: IngredientRequirement): BasketLine[] | null {
       const key = `${storeId}:${item.ingredientId}:${item.quantity}:${item.unit}`;
-      if (!packageCache.has(key)) packageCache.set(key, purchasePackages(item.ingredientId, item, packagesByStore.get(storeId)?.get(item.ingredientId) ?? [], currency));
+      if (!packageCache.has(key)) packageCache.set(key, exactPurchase(item, packagesByStore.get(storeId)?.get(item.ingredientId) ?? []));
       return packageCache.get(key)!;
     }
     function basketsFor(requirements: IngredientRequirement[]): RepricedBasket<B>[] {
@@ -144,6 +149,31 @@ export function createPackageOptimizer<B extends PriceBasis>(basis: B, options: 
           : { status: "complete", storeId: store.id, lines, total: { amountCents: moneyTotal(lines), currency }, basis };
       });
     }
+    const mixedIdentity = new Map<string, { storeId: string; productId: string }>();
+    const mixedPackages: PricedPackage[] = [];
+    if (options.onMixedPlan) for (const store of stores) {
+      if (unavailableReasons.has(store.id)) continue;
+      for (const packages of packagesByStore.get(store.id)!.values()) for (const item of packages) {
+        const id = JSON.stringify([store.id, item.product.id]);
+        mixedIdentity.set(id, { storeId: store.id, productId: item.product.id });
+        mixedPackages.push({ ...item, product: { ...item.product, id } });
+      }
+    }
+    const mixedCache = new Map<string, MixedStorePlan["lines"] | null>();
+    function mixedFor(requirements: IngredientRequirement[]): MixedStorePlan["lines"] | null {
+      const lines: MixedStorePlan["lines"] = [];
+      for (const item of requirements) {
+        const key = `${item.ingredientId}:${item.quantity}:${item.unit}`;
+        if (!mixedCache.has(key)) {
+          const purchases = exactPurchase(item, mixedPackages);
+          mixedCache.set(key, purchases?.map(line => ({ ...line, ...mixedIdentity.get(line.productId)! })) ?? null);
+        }
+        const purchases = mixedCache.get(key);
+        if (!purchases) return null;
+        lines.push(...purchases);
+      }
+      return lines;
+    }
     function totalNutrition(requirements: IngredientRequirement[]): Nutrition {
       const nutrition = emptyNutrition();
       for (const item of requirements) {
@@ -153,8 +183,36 @@ export function createPackageOptimizer<B extends PriceBasis>(basis: B, options: 
       for (const key of Object.keys(nutrition) as (keyof Nutrition)[]) nutrition[key] = Math.round(nutrition[key] * 10) / 10;
       return nutrition;
     }
-    interface Candidate { meals: Recipe[]; requirements: IngredientRequirement[]; baskets: RepricedBasket<B>[]; recommended: CompleteBasket<B>; nutrition: Nutrition; score: number; signature: string }
+    interface RankedPlan { meals: Recipe[]; requirements: IngredientRequirement[]; nutrition: Nutrition; score: number; signature: string; cost: number; tieId: string }
+    interface Candidate extends RankedPlan { baskets: RepricedBasket<B>[]; recommended: CompleteBasket<B> }
+    interface MixedCandidate extends RankedPlan { baskets: RepricedBasket<B>[]; lines: MixedStorePlan["lines"] }
+    function rank(meals: Recipe[], requirements: IngredientRequirement[], lines: BasketLine[], amountCents: number, signature: string, tieId: string): RankedPlan {
+      const nutrition = totalNutrition(requirements);
+      const servings = preferences.mealCount * preferences.servingsPerMeal;
+      const protein = nutrition.proteinG / servings / 40;
+      const nutrientScore = protein * .7 + nutrition.fiberG / servings / 12 * .3;
+      const variety = new Set(meals.map(recipe => recipe.id)).size / meals.length;
+      const leftover = requirements.reduce((sum, item) => {
+        const purchases = lines.filter(line => line.ingredientId === item.ingredientId);
+        return sum + purchases.reduce((value, line) => value + line.leftover.quantity, 0) / purchases.reduce((value, line) => value + line.purchased.quantity, 0);
+      }, 0) / requirements.length;
+      const reuse = requirements.filter(item => meals.filter(recipe => recipe.ingredients.some(ingredient => ingredient.ingredientId === item.ingredientId)).length > 1).length / requirements.length;
+      const cost = amountCents / preferences.weeklyBudget.amountCents;
+      const proteinBonus = preferences.nutritionPriorities.includes("high-protein") ? protein * .15 : 0;
+      const score = preferences.objective === "minimize-cost" ? amountCents
+        : preferences.objective === "maximize-nutrition" ? -nutrientScore - proteinBonus + cost * .05 + leftover * .03 - variety * .03
+        : cost * .55 - nutrientScore * .25 - variety * .1 + leftover * .07 - reuse * .03 - proteinBonus;
+      return { meals, requirements, nutrition, score, signature, cost: amountCents, tieId };
+    }
+    function better(candidate: RankedPlan, previous: RankedPlan | null): boolean {
+      if (!previous) return true;
+      if (Math.abs(candidate.score - previous.score) > 1e-9) return candidate.score < previous.score;
+      if (preferences.objective === "minimize-cost" && preferences.nutritionPriorities.includes("high-protein") && candidate.nutrition.proteinG !== previous.nutrition.proteinG) return candidate.nutrition.proteinG > previous.nutrition.proteinG;
+      return candidate.cost < previous.cost || (candidate.cost === previous.cost && (candidate.signature < previous.signature
+        || (candidate.signature === previous.signature && candidate.tieId < previous.tieId)));
+    }
     let best: Candidate | null = null;
+    let bestMixed: MixedCandidate | null = null;
     let minimumKnown = Infinity;
     const seen = new Set<string>();
     for (const generated of candidates(eligible, preferences.mealCount)) {
@@ -165,35 +223,36 @@ export function createPackageOptimizer<B extends PriceBasis>(basis: B, options: 
       seen.add(signature); evaluatedCombinations++;
       const requirements = aggregateRequirements(meals, preferences.servingsPerMeal);
       const baskets = basketsFor(requirements);
-      const complete = baskets.filter((basket): basket is CompleteBasket<B> => basket.status === "complete")
-        .sort((a, b) => a.total.amountCents - b.total.amountCents || a.storeId.localeCompare(b.storeId, "en"));
-      const recommended = complete[0];
-      if (!recommended) continue;
-      minimumKnown = Math.min(minimumKnown, recommended.total.amountCents);
-      if (recommended.total.amountCents > preferences.weeklyBudget.amountCents) continue;
-      const nutrition = totalNutrition(requirements);
-      const servings = preferences.mealCount * preferences.servingsPerMeal;
-      const protein = nutrition.proteinG / servings / 40;
-      const nutrientScore = protein * .7 + nutrition.fiberG / servings / 12 * .3;
-      const variety = new Set(meals.map(recipe => recipe.id)).size / meals.length;
-      const leftover = requirements.reduce((sum, item) => {
-        const lines = recommended.lines.filter(line => line.ingredientId === item.ingredientId);
-        return sum + lines.reduce((value, line) => value + line.leftover.quantity, 0) / lines.reduce((value, line) => value + line.purchased.quantity, 0);
-      }, 0) / requirements.length;
-      const reuse = requirements.filter(item => meals.filter(recipe => recipe.ingredients.some(ingredient => ingredient.ingredientId === item.ingredientId)).length > 1).length / requirements.length;
-      const cost = recommended.total.amountCents / preferences.weeklyBudget.amountCents;
-      const proteinBonus = preferences.nutritionPriorities.includes("high-protein") ? protein * .15 : 0;
-      const score = preferences.objective === "minimize-cost" ? recommended.total.amountCents
-        : preferences.objective === "maximize-nutrition" ? -nutrientScore - proteinBonus + cost * .05 + leftover * .03 - variety * .03
-        : cost * .55 - nutrientScore * .25 - variety * .1 + leftover * .07 - reuse * .03 - proteinBonus;
-      const compareTie = (previous: Candidate): boolean => {
-        if (preferences.objective === "minimize-cost" && preferences.nutritionPriorities.includes("high-protein") && nutrition.proteinG !== previous.nutrition.proteinG) return nutrition.proteinG > previous.nutrition.proteinG;
-        return recommended.total.amountCents < previous.recommended.total.amountCents || (recommended.total.amountCents === previous.recommended.total.amountCents
-          && (signature < previous.signature || (signature === previous.signature && recommended.storeId < previous.recommended.storeId)));
-      };
-      const better = !best || score < best.score - 1e-9 || (Math.abs(score - best.score) <= 1e-9 && compareTie(best));
-      if (better) best = { meals, requirements, baskets, recommended, nutrition, score, signature };
+      const recommended = baskets.filter((basket): basket is CompleteBasket<B> => basket.status === "complete")
+        .sort((a, b) => a.total.amountCents - b.total.amountCents || a.storeId.localeCompare(b.storeId, "en"))[0];
+      if (recommended) {
+        minimumKnown = Math.min(minimumKnown, recommended.total.amountCents);
+        if (recommended.total.amountCents <= preferences.weeklyBudget.amountCents) {
+          const ranked = rank(meals, requirements, recommended.lines, recommended.total.amountCents, signature, recommended.storeId);
+          if (better(ranked, best)) best = { ...ranked, baskets, recommended };
+        }
+      }
+      if (options.onMixedPlan) {
+        const lines = mixedFor(requirements);
+        if (lines && moneyTotal(lines) <= preferences.weeklyBudget.amountCents) {
+          const ranked = rank(meals, requirements, lines, moneyTotal(lines), signature, lines.map(line => `${line.storeId}:${line.productId}`).join("|"));
+          if (better(ranked, bestMixed)) bestMixed = { ...ranked, baskets, lines };
+        }
+      }
     }
+    if (packageSearchTruncated) { exhaustive = false; notices.push("Some exact package searches reached their calculation limit. This run cannot establish optimality or infeasibility."); }
+    if (bestMixed) {
+      const winner = bestMixed;
+      const compared = winner.baskets.filter((basket): basket is CompleteBasket<B> => basket.status === "complete")
+        .sort((a, b) => a.total.amountCents - b.total.amountCents || a.storeId.localeCompare(b.storeId, "en"))[0];
+      options.onMixedPlan?.({ basis, optimality: exhaustive ? "proven" : "best-found", lines: winner.lines,
+        meals: winner.meals.map((recipe, slot) => ({ slot, recipeId: recipe.id, servings: preferences.servingsPerMeal })),
+        requirements: winner.requirements, estimatedTotalNutrition: winner.nutrition,
+        total: { amountCents: winner.cost, currency }, budgetRemaining: { amountCents: preferences.weeklyBudget.amountCents - winner.cost, currency },
+        stores: [...new Set(winner.lines.map(line => line.storeId))].sort().map(storeId => ({ storeId, total: { amountCents: moneyTotal(winner.lines.filter(line => line.storeId === storeId)), currency } })),
+        savings: compared ? { comparedToStoreId: compared.storeId, amount: { amountCents: compared.total.amountCents - winner.cost, currency } } : null });
+      notices.push("A separately optimized complete mixed-store plan is included. Its meals can differ from the single-store plan; only identical-plan complete baskets support its savings. Travel, taxes and fees are excluded.");
+    } else options.onMixedPlan?.(null);
     if (!best) {
       if (!exhaustive) return { ...base(), status: "incomplete", reason: "search-limit", message: "The search limit was reached without finding a fully priced plan within your budget. Other combinations may still work." };
       return { ...base(), status: "infeasible", reason: Number.isFinite(minimumKnown) ? "budget" : "pricing-unavailable",

@@ -1,5 +1,7 @@
 # Backend implementation handoff
 
+Current update: [automatic selection and official Kroger pricing](../../docs/BACKEND-PRICING-HANDOFF.md) adds an official US adapter, exact automatic branch resolution, `/api/v2/plan`, selected-store metadata and independently optimized mixed-store baskets. The historical sections below predate those additions. No frontend files were edited. No credentials are available in this checkout, so production prices and real complete baskets remain unverified.
+
 The public v1 request/response shapes in `src/contracts/` are unchanged. The earlier implementation-status tables in PLAN.md and docs/API.md describe the former stubs; the routes now implement the behavior below.
 
 - `POST /api/stores`, demo: existing fictional country-specific stores; no location lookup.

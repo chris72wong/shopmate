@@ -1,6 +1,6 @@
 import "server-only";
 import { createHash } from "node:crypto";
-import { currencyForCountry, type Country, type DataMode, type OptimizationRequest, type OptimizationResultV2, type PricingResultV2, type PricingSetV2, type RetailProductObservation, type Store, type StorePricingV2 } from "@/contracts";
+import { currencyForCountry, type Country, type DataMode, type MixedStorePlan, type OptimizationRequest, type OptimizationResultV2, type PricingResultV2, type PricingSetV2, type RetailProductObservation, type RetailPricingProvider, type Store, type StorePricingV2 } from "@/contracts";
 import { ingredients } from "@/data/ingredients";
 import { recipes } from "@/data/recipes";
 import { products } from "@/data/pricing";
@@ -10,6 +10,7 @@ import { illustrativePricing } from "@/server/pricing/illustrative";
 import { bindingForStore, loadRetailConfig, type BranchBinding, type RetailConfig } from "@/server/pricing/retail-config";
 import { matchVerifiedOffer } from "@/server/pricing/matching";
 import { ReefPricingAdapter } from "@/server/pricing/reef";
+import { KrogerPricingAdapter } from "@/server/pricing/kroger";
 import { createPackageOptimizer, DEFAULT_EVALUATION_LIMIT, OPTIMIZER_VERSION, type EngineOptions, type PackageSnapshot } from "@/server/optimization/engine";
 
 export const CATALOG_VERSION = `catalog-${createHash("sha256").update(JSON.stringify({ ingredients, recipes, products })).digest("hex").slice(0, 16)}`;
@@ -19,13 +20,28 @@ export interface RetailAdapter {
   configured(): boolean;
   verifyBranch(binding: BranchBinding): Promise<void>;
   search(binding: BranchBinding, query: string): Promise<RetailProductObservation[]>;
+  lookup?(binding: BranchBinding, productId: string): Promise<RetailProductObservation[]>;
+  resolveBranch?(store: ResolvedStore): Promise<BranchBinding | undefined>;
 }
-interface PricingOptions { config?: RetailConfig; adapter?: RetailAdapter; now?: () => number; engineOptions?: EngineOptions }
+interface PricingOptions { config?: RetailConfig; adapter?: RetailAdapter; adapters?: Partial<Record<RetailPricingProvider, RetailAdapter>>; now?: () => number; engineOptions?: EngineOptions }
 export function createRetailPricingService(options: PricingOptions = {}) {
-  const adapter = options.adapter ?? new ReefPricingAdapter();
+  const reef = new ReefPricingAdapter();
+  const adapters: Record<RetailPricingProvider, RetailAdapter> = { "reef-loblaws": reef, "reef-kroger": reef, kroger: new KrogerPricingAdapter(), ...options.adapters };
   const now = options.now ?? Date.now;
   const readConfig = () => options.config ?? loadRetailConfig();
-  const mappingsFor = (binding: BranchBinding, config: RetailConfig) => config.mappings.filter(item => item.providerId === binding.providerId && item.retailer === binding.retailer).slice(0, 12);
+  const mappingsFor = (binding: BranchBinding, config: RetailConfig) => config.mappings.filter(item => item.providerId === binding.providerId && item.retailer === binding.retailer)
+    .sort((a, b) => a.ingredientId.localeCompare(b.ingredientId, "en") || (a.productId ?? a.expectedName).localeCompare(b.productId ?? b.expectedName, "en")).slice(0, 64);
+  async function connection(store: ResolvedStore, config: RetailConfig) {
+    const binding = bindingForStore(store, config);
+    if (binding) return { binding, adapter: options.adapter ?? adapters[binding.providerId] };
+    // Never repair a conflicting reviewed mapping by silently choosing a different branch/provider.
+    if (config.bindings.some(item => `google:${item.googlePlaceId}` === store.id)) return undefined;
+    for (const adapter of options.adapter ? [options.adapter] : [...new Set(Object.values(adapters))]) {
+      const resolved = await adapter.resolveBranch?.(store);
+      if (resolved) return { binding: resolved, adapter };
+    }
+    return undefined;
+  }
   function validateStores(mode: DataMode, country: Country, stores: readonly ResolvedStore[]) {
     if (!stores.length || stores.length > 3 || new Set(stores.map(store => store.id)).size !== stores.length || stores.some(store => store.country !== country || store.source !== (mode === "demo" ? "demo" : "google"))) invalidRequest("storeIds", "Resolve one to three different selected stores in the same country and mode.");
   }
@@ -36,7 +52,15 @@ export function createRetailPricingService(options: PricingOptions = {}) {
     const deadline = now() + 20_000;
     const withinDeadline = () => { if (now() >= deadline) throw new ServiceError(502, { code: "provider-error", message: "The overall pricing deadline was reached." }); };
     const results: PricingSetV2[] = [];
-    // At most 12 reviewed SKU searches per store. Sequential calls avoid provider bursts.
+    const interruptions: string[] = [];
+    const failed = (storeId: string, error: unknown): Extract<PricingSetV2, { status: "unavailable" }> => {
+      const code = error instanceof ServiceError ? error.error.code : "provider-error";
+      return { status: "unavailable", storeId, reason: code === "rate-limited" ? "rate-limited" : code === "provider-not-configured" ? "provider-not-configured" : "provider-error",
+        message: code === "provider-not-configured" ? "Real retailer pricing is not configured for this store. No sample prices were substituted."
+          : code === "rate-limited" ? "Retailer price checks are busy for this store. Try again later."
+          : "Ingredient prices could not be verified at this store. Try again or choose other stores. No sample prices were substituted." };
+    };
+    // Sequential bounded calls, exact SKU lookup where supported, and a single request-local quote set.
     for (const store of stores) {
       if (mode === "demo") {
         const snapshot = await illustrativePricing.getOffers(store, products.filter(product => product.countries.includes(country)).map(product => product.id));
@@ -44,34 +68,44 @@ export function createRetailPricingService(options: PricingOptions = {}) {
           : { ...snapshot, missingIngredientIds: ingredients.filter(ingredient => !snapshot.offers.some(offer => products.some(product => product.id === offer.productId && product.ingredientId === ingredient.id))).map(ingredient => ingredient.id).sort() });
         continue;
       }
-      const binding = bindingForStore(store, config);
-      if (!binding) { results.push({ status: "unavailable", storeId: store.id, reason: "unsupported-store", message: "Ingredient prices are unavailable for this store. Its location is not connected to a verified retailer price source. Google supplies locations, not ingredient prices." }); continue; }
-      if (!adapter.configured()) { results.push({ status: "unavailable", storeId: store.id, reason: "provider-not-configured", message: "Real retailer pricing is not configured for this store. Google supplies locations, not ingredient prices." }); continue; }
-      const mappings = mappingsFor(binding, config);
-      if (!mappings.length) { results.push({ status: "unavailable", storeId: store.id, reason: "provider-not-configured", message: "Ingredient pricing has not been configured for this store’s products. No sample prices were substituted." }); continue; }
       try {
+        withinDeadline();
+        const connected = await connection(store, config);
+        if (!connected) { results.push({ status: "unavailable", storeId: store.id, reason: "unsupported-store", message: "Ingredient prices are unavailable for this store. Its location is not connected to a verified retailer price source. Google supplies locations, not ingredient prices." }); continue; }
+        const { binding, adapter } = connected;
+        if (!adapter.configured()) { results.push({ status: "unavailable", storeId: store.id, reason: "provider-not-configured", message: "Real retailer pricing is not configured for this store. Google supplies locations, not ingredient prices." }); continue; }
+        const mappings = mappingsFor(binding, config);
+        if (!mappings.length) { results.push({ status: "unavailable", storeId: store.id, reason: "provider-not-configured", message: "Ingredient pricing has not been configured for this store’s products. No sample prices were substituted." }); continue; }
         withinDeadline();
         await adapter.verifyBranch(binding);
         const offers: Extract<PricingSetV2, { basis: "verified" }>["offers"] = [];
+        let interruption: unknown;
+        const observationsByQuery = new Map<string, RetailProductObservation[]>();
         for (const mapping of mappings) {
-          withinDeadline();
-          const ingredient = ingredients.find(item => item.id === mapping.ingredientId);
-          if (!ingredient) throw new ServiceError(503, { code: "provider-not-configured", message: "A reviewed product mapping references an unknown ingredient." });
-          const observations = await adapter.search(binding, mapping.expectedName);
-          const matches = observations.flatMap(observation => { const offer = matchVerifiedOffer(observation, mapping, binding, ingredient, now()); return offer ? [offer] : []; });
-          // Name-only matching must be unambiguous. Never choose the cheapest loosely related row.
-          if (matches.length === 1 && !offers.some(offer => offer.product.id === matches[0]!.product.id)) offers.push(matches[0]!);
+          try {
+            withinDeadline();
+            const ingredient = ingredients.find(item => item.id === mapping.ingredientId);
+            if (!ingredient) throw new ServiceError(503, { code: "provider-not-configured", message: "A reviewed product mapping references an unknown ingredient." });
+            const exact = Boolean(mapping.productId && adapter.lookup);
+            const queryKey = exact ? `sku:${mapping.productId}` : `search:${mapping.expectedName}`;
+            let observations = observationsByQuery.get(queryKey);
+            if (!observations) {
+              observations = exact ? await adapter.lookup!(binding, mapping.productId!) : await adapter.search(binding, mapping.expectedName);
+              observationsByQuery.set(queryKey, observations);
+            }
+            const matches = observations.flatMap(observation => { const offer = matchVerifiedOffer(observation, mapping, binding, ingredient, now()); return offer ? [offer] : []; });
+            // Name-only matching must be unambiguous. Never choose the cheapest loosely related row.
+            if (matches.length === 1 && !offers.some(offer => offer.product.id === matches[0]!.product.id)) offers.push(matches[0]!);
+          } catch (error) { interruption = error; break; }
         }
         const fresh = offers.filter(offer => Date.parse(offer.provenance.expiresAt) > now());
+        if (interruption) interruptions.push(`Price checks stopped early for ${store.id}. Fresh verified offers are retained; unqueried ingredients remain missing. Retry to check remaining products.`);
         results.push(fresh.length ? { status: "available", storeId: store.id, basis: "verified", offers: fresh,
           missingIngredientIds: ingredients.filter(ingredient => !fresh.some(offer => offer.product.ingredientId === ingredient.id)).map(item => item.id).sort() }
+          : interruption ? failed(store.id, interruption)
           : { status: "unavailable", storeId: store.id, reason: "no-usable-offers", message: "No fresh, available products match the reviewed ingredient and package mappings at this branch." });
       } catch (error) {
-        const code = error instanceof ServiceError ? error.error.code : "provider-error";
-        results.push({ status: "unavailable", storeId: store.id, reason: code === "rate-limited" ? "rate-limited" : code === "provider-not-configured" ? "provider-not-configured" : "provider-error",
-          message: code === "provider-not-configured" ? "Real retailer pricing is not configured for this store. No sample prices were substituted."
-            : code === "rate-limited" ? "Retailer price checks are busy for this store. Try again later."
-            : "Ingredient prices could not be verified at this store. Try again or choose other stores. No sample prices were substituted." });
+        results.push(failed(store.id, error));
       }
     }
     // A quote from the first branch may expire while a later branch is fetched.
@@ -96,11 +130,12 @@ export function createRetailPricingService(options: PricingOptions = {}) {
     const coverageNotices = !results.some(result => result.status === "available" && result.offers.length > 0)
       ? ["Ingredient prices unavailable. Choose other stores, retry the price check, or explicitly open the sample experience. Google provides store locations, not ingredient prices."]
       : results.some(result => result.status === "unavailable" || result.missingIngredientIds.length > 0)
-        ? ["Ingredient price coverage is partial. You may continue, but a plan needs every required ingredient priced at one selected store. The planner checks basket completeness; incomplete baskets have no comparable total."] : [];
+        ? ["Ingredient price coverage is partial. You may continue, but a complete plan needs every required ingredient priced at one store or across a complete mixed-store basket. The planner checks coverage; incomplete baskets have no comparable total."] : [];
     return { mode, country, currency, catalogVersion: CATALOG_VERSION, stores: results,
       notices: mode === "demo" ? ["Fictional demo stores and illustrative prices only."] : ["Real quotes are limited to reviewed products at verified physical branches in one price channel.",
         ...coverageNotices,
-        "At most 12 reviewed product searches per store per run. Missing or unqueried ingredients remain unavailable.",
+        ...interruptions,
+        "At most 64 reviewed product lookups per store per run, subject to the shared deadline and provider quota. Missing or unqueried ingredients remain unavailable.",
         "Loyalty, coupons, multi-buy, estimated variable-weight and expired prices are excluded. Taxes, fees and deposits are excluded.", "Retailer quotes may change before checkout. Nutrition and allergen metadata remain sample estimates."] };
   }
   async function optimize(request: OptimizationRequest, stores: readonly ResolvedStore[]): Promise<OptimizationResultV2> {
@@ -113,13 +148,21 @@ export function createRetailPricingService(options: PricingOptions = {}) {
       return { storeId: snapshot.storeId, packages: snapshot.offers.flatMap(offer => { const product = products.find(item => item.id === offer.productId); return product ? [{ product, price: offer.price }] : []; }) };
     });
     let candidateRecipeIds: string[] = [];
-    const engine = createPackageOptimizer(basis, { ...options.engineOptions, onCandidates: ids => { candidateRecipeIds = ids; } });
+    let mixedStorePlan: MixedStorePlan | null = null;
+    const engine = createPackageOptimizer(basis, { ...options.engineOptions, onCandidates: ids => { candidateRecipeIds = ids; }, onMixedPlan: plan => { mixedStorePlan = plan; } });
     const result = await engine(request, stores, async () => snapshots);
     if (result.status === "feasible") for (const basket of result.baskets) if (basket.status === "complete" && basket.basis === "verified") {
       const priced = prices.stores.find(item => item.storeId === basket.storeId);
       if (priced?.status !== "available" || priced.basis !== "verified" || basket.lines.some(line => !priced.offers.some(offer => offer.product.id === line.productId && Date.parse(offer.provenance.expiresAt) > now()))) throw new ServiceError(502, { code: "provider-error", message: "Prices expired during planning. Please request a fresh plan." });
     }
-    return { ...result, catalogVersion: CATALOG_VERSION, optimizerVersion: OPTIMIZER_VERSION, pricing: prices,
+    if (mixedStorePlan !== null) {
+      const plan: MixedStorePlan = mixedStorePlan;
+      if (basis === "verified" && plan.lines.some(line => {
+        const priced = prices.stores.find(item => item.storeId === line.storeId);
+        return priced?.status !== "available" || priced.basis !== "verified" || !priced.offers.some(offer => offer.product.id === line.productId && Date.parse(offer.provenance.expiresAt) > now());
+      })) throw new ServiceError(502, { code: "provider-error", message: "Prices expired during planning. Please request a fresh plan." });
+    }
+    return { ...result, catalogVersion: CATALOG_VERSION, optimizerVersion: OPTIMIZER_VERSION, pricing: prices, mixedStorePlan,
       search: { ...result.search, evaluationLimit: options.engineOptions?.evaluationLimit ?? DEFAULT_EVALUATION_LIMIT, candidateRecipeIds } };
   }
   async function storePricing(store: Store): Promise<StorePricingV2> {
@@ -127,11 +170,14 @@ export function createRetailPricingService(options: PricingOptions = {}) {
     let config: RetailConfig;
     try { config = readConfig(); }
     catch { return { status: "unavailable", profileId: null, reason: "Ingredient prices unavailable. Real retailer pricing needs valid store and product configuration." }; }
-    const binding = bindingForStore(store, config);
-    if (!binding) return { status: "unavailable", profileId: null, reason: "Ingredient prices unavailable. This store is not connected to a verified retailer price source." };
-    if (!adapter.configured()) return { status: "unavailable", profileId: null, reason: "Ingredient prices unavailable. Real retailer pricing is not configured." };
-    if (!mappingsFor(binding, config).length) return { status: "unavailable", profileId: null, reason: "Ingredient prices unavailable. Pricing for this store’s products has not been configured." };
-    try { await adapter.verifyBranch(binding); return { status: "verified-capable", providerId: binding.providerId, channel: binding.channel }; }
+    try {
+      const connected = await connection(store, config);
+      if (!connected) return { status: "unavailable", profileId: null, reason: "Ingredient prices unavailable. This store is not connected to a verified retailer price source." };
+      const { binding, adapter } = connected;
+      if (!adapter.configured()) return { status: "unavailable", profileId: null, reason: "Ingredient prices unavailable. Real retailer pricing is not configured." };
+      if (!mappingsFor(binding, config).length) return { status: "unavailable", profileId: null, reason: "Ingredient prices unavailable. Pricing for this store’s products has not been configured." };
+      await adapter.verifyBranch(binding); return { status: "verified-capable", providerId: binding.providerId, channel: binding.channel };
+    }
     catch { return { status: "unavailable", profileId: null, reason: "Ingredient prices unavailable. This store’s retailer price source could not be verified. Retry or choose other stores." }; }
   }
   return { pricing, optimize, storePricing };

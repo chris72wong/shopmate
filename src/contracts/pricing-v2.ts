@@ -1,10 +1,11 @@
 import { z } from "zod";
-import { countrySchema, currencyForCountry, optimizationRequestSchema, preferencesSchema } from "./schemas";
-import type { BasketComparison, Country, Currency, DataMode, FeasibleOptimization, IncompleteOptimization, InfeasibleOptimization, Money, ProductOffer, ProductPackage, Quantity, Store } from "./domain";
+import { countrySchema, currencyForCountry, locationInputSchema, optimizationRequestSchema, preferencesSchema } from "./schemas";
+import type { BasketComparison, BasketLine, Country, Currency, DataMode, FeasibleOptimization, IncompleteOptimization, InfeasibleOptimization, Money, ProductOffer, ProductPackage, Quantity, Store } from "./domain";
+import type { ApiError, StoreDiscoveryResult } from "./api";
 
 export type PriceBasis = "illustrative" | "verified";
 export type PriceChannel = "in-store" | "pickup" | "delivery";
-export type RetailPricingProvider = "reef-loblaws" | "reef-kroger";
+export type RetailPricingProvider = "reef-loblaws" | "reef-kroger" | "kroger";
 export interface Promotion {
   type: "unconditional-sale" | "loyalty" | "multi-buy" | "coupon" | "unknown";
   price: Money; validFrom: string | null; validTo: string | null;
@@ -32,6 +33,11 @@ export type StorePricingV2 =
   | { status: "verified-capable"; providerId: RetailPricingProvider; channel: PriceChannel }
   | { status: "unavailable"; profileId: null; reason: string };
 export type StoreV2 = Store extends infer S ? S extends Store ? Omit<S, "pricing"> & { pricing: StorePricingV2 } : never : never;
+export interface StoreDiscoveryResultV2 extends Omit<StoreDiscoveryResult, "stores"> {
+  stores: StoreV2[];
+  selectedStoreIds: string[];
+  selection: { strategy: "nearest-distinct-banners" | "demo-order"; limit: 3; distanceBasis: "straight-line" | null; exhaustive: false; candidateLimit: 20 | null };
+}
 export type PricingSetV2 =
   | { status: "available"; storeId: string; basis: "illustrative"; offers: ProductOffer[]; missingIngredientIds: string[] }
   | { status: "available"; storeId: string; basis: "verified"; offers: VerifiedOffer[]; missingIngredientIds: string[] }
@@ -43,7 +49,17 @@ export type CoreOptimizationResult<B extends PriceBasis> =
   | (Omit<FeasibleOptimization, "pricingBasis" | "baskets"> & { pricingBasis: B; baskets: RepricedBasket<B>[] })
   | (Omit<InfeasibleOptimization, "pricingBasis"> & { pricingBasis: B })
   | (Omit<IncompleteOptimization, "pricingBasis"> & { pricingBasis: B });
+export interface MixedStorePlan extends Pick<FeasibleOptimization, "meals" | "requirements" | "estimatedTotalNutrition" | "budgetRemaining"> {
+  basis: PriceBasis;
+  optimality: "proven" | "best-found";
+  lines: (BasketLine & { storeId: string })[];
+  stores: { storeId: string; total: Money }[];
+  total: Money;
+  /** Only the cheapest complete single-store basket for these identical meals. */
+  savings: { comparedToStoreId: string; amount: Money } | null;
+}
 type ResultMetadata = { catalogVersion: string; optimizerVersion: string; pricing: PricingResultV2;
+  mixedStorePlan?: MixedStorePlan | null;
   search: { evaluatedCombinations: number; exhaustive: boolean; evaluationLimit: number; candidateRecipeIds: string[] } };
 export type OptimizationResultV2 = (CoreOptimizationResult<PriceBasis> extends infer R ? R extends { search: unknown } ? Omit<R, "search"> & ResultMetadata : never : never);
 
@@ -59,3 +75,25 @@ export const optimizationRequestV2Schema = z.strictObject({ ...pricingRequestV2S
   if (!parsed.success) for (const issue of parsed.error.issues) context.addIssue({ code: "custom", path: issue.path, message: issue.message });
   if (input.preferences.weeklyBudget.currency !== currencyForCountry(input.country)) context.addIssue({ code: "custom", path: ["preferences", "weeklyBudget", "currency"], message: "Country and currency must agree." });
 });
+
+/** One call can discover, select and plan; storeIds is an optional explicit override. */
+export const planningRequestV2Schema = z.strictObject({ mode: z.enum(["demo", "live"]), location: locationInputSchema, radiusKm: z.number().min(1).max(50).default(5),
+  catalogVersion: z.string().min(1).max(64), preferences: preferencesSchema, storeIds: storeIds.optional(),
+}).superRefine((input, context) => {
+  if (!input.storeIds) {
+    if (input.preferences.weeklyBudget.currency !== currencyForCountry(input.location.country)) context.addIssue({ code: "custom", path: ["preferences", "weeklyBudget", "currency"], message: "Country and currency must agree." });
+    return;
+  }
+  const parsed = optimizationRequestV2Schema.safeParse({ mode: input.mode, country: input.location.country,
+    catalogVersion: input.catalogVersion, preferences: input.preferences,
+    storeIds: input.storeIds,
+  });
+  if (!parsed.success) for (const issue of parsed.error.issues) context.addIssue({ code: "custom", path: issue.path, message: issue.message });
+});
+export interface PlanningResultV2 {
+  status: "planned" | "pricing-unavailable" | "no-plan" | "no-stores";
+  discovery: StoreDiscoveryResultV2;
+  selectedStoreIds: string[];
+  optimization: OptimizationResultV2 | null;
+  pricingError: ApiError | null;
+}
