@@ -44,7 +44,7 @@ try {
   }
   assert(ready, `Production server did not become ready: ${output}`);
   const home = await (await get("/")).text();
-  assert(home.includes("Your groceries."));
+  assert(home.includes("Good food."));
   assert(home.includes('href="/plan"'), "The homepage must link to the planner");
   assert(home.includes("Find your stores") && home.includes("Compare your options") && home.includes("Plan your meals"));
   assert(!home.includes("/photos/") && !home.includes("Photo credits"), "Replaced stock photos must not return");

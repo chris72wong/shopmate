@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
-import { Header, Footer } from "@/components/shell";
+import { Header } from "@/components/shell";
 import "./globals.css";
 
 const dmSans = localFont({ src: "./fonts/dm-sans.ttf", variable: "--font-app", weight: "100 1000", display: "swap" });
@@ -15,6 +15,5 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <a href="#main-content" className="skip-link">Skip to content</a>
     <Header />
     <main id="main-content">{children}</main>
-    <Footer />
   </body></html>;
 }

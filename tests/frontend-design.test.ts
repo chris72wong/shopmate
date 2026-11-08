@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { OptimizationResult } from "@/contracts";
 import { PlanResults } from "@/components/plan-results";
+import { Homepage } from "@/components/homepage";
 import { recipes } from "@/data/recipes";
 import { ingredients } from "@/data/ingredients";
 import { products } from "@/data/pricing";
@@ -27,7 +28,7 @@ describe("redesigned results retain product honesty", () => {
     expect(html).toContain("Illustrative prices");
     expect(html).toContain(country === "CA" ? "CAD" : "USD");
     expect(html).toContain("Nutrition is estimated");
-    expect(html).toContain("Original illustrations");
+    expect(html).toContain('class="meal-art');
     expect(html).not.toMatch(/Verified quote|\/photos\//);
   });
 
@@ -47,6 +48,16 @@ describe("redesigned results retain product honesty", () => {
     const html = renderToStaticMarkup(createElement(PlanResults, { ...props, result }));
     expect(html).toContain(result.message);
     expect(html).toContain("Edit preferences");
-    expect(html).not.toMatch(/CAD|USD|Lowest known cost|YOUR COMPLETE BASKET/);
+    expect(html).not.toMatch(/CAD|USD|Lowest known cost|Basket total/);
+  });
+});
+
+describe("concise visual homepage", () => {
+  it("keeps the visible copy under 70 words and omits star decorations", () => {
+    const html = renderToStaticMarkup(createElement(Homepage));
+    const words = html.replace(/<[^>]*>/g, " ").trim().split(/\s+/);
+    expect(words.length).toBeLessThanOrEqual(70);
+    expect(html).not.toMatch(/[✳★✦✧✨]|hero-sticker|hero-note|sample-section/);
+    expect(html).toContain("Pause grocery animation");
   });
 });

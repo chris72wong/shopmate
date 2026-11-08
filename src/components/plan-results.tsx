@@ -63,10 +63,10 @@ function FeasiblePlan({ result, stores, recipes, ingredients, products, onEdit }
   }
 
   return <>
-    <SectionHeading title={view === "list" ? "Good things to pick up." : view === "nutrition" ? "A little food for thought." : view === "stores" ? "One basket. Your options." : "Look what’s cooking."}>{view === "list" ? "Your meals, gathered into one handy shopping list." : view === "nutrition" ? "A closer look at your plan’s estimated nutrition." : view === "stores" ? "Compare the same whole-package shopping basket at your selected stores." : "Your budget, preferences and next meals, all together."}</SectionHeading>
+    <SectionHeading title={view === "list" ? "Shopping list" : view === "nutrition" ? "Nutrition" : view === "stores" ? "Compare stores" : "Your meals"} />
     {view !== "nutrition" && <p className="data-note">{result.pricingBasis === "verified" ? "Verified branch quotes · prices may change before checkout" : "Illustrative prices"}</p>}
     {(view === "meals" || view === "stores") && <div className="plan-cost">
-    <div className="cost-line"><div><span className="cost-label">YOUR COMPLETE BASKET · {basisLabel.toUpperCase()}</span><strong>{formatMoney(result.total)}</strong></div><span className="budget-left"><Icon name="check" />{formatMoney(result.budgetRemaining)} left in your budget</span></div>
+    <div className="cost-line"><div><span className="cost-label">Basket total</span><strong>{formatMoney(result.total)}</strong></div><span className="budget-left">{formatMoney(result.budgetRemaining)} left</span></div>
       <p>{storeName(result.recommendedStoreId)} · {result.meals.length} {result.meals.length === 1 ? "meal" : "meals"}</p>
       {recommendedOffers.length > 0 && <p className="small-note">{recommendedOffers[0]!.provenance.channel} · retrieved {new Date(Math.min(...recommendedOffers.map(offer => Date.parse(offer.provenance.retrievedAt)))).toLocaleString()} · excludes taxes, fees and deposits</p>}
     </div>}
@@ -91,11 +91,11 @@ function FeasiblePlan({ result, stores, recipes, ingredients, products, onEdit }
             </div> : <p className="small-note">Recipe details are missing from the current catalog.</p>}
           </details>;
         })}</div>
-        <p className="result-footnote">Original illustrations are serving inspiration. Nutrition is estimated.</p>
+        <p className="result-footnote">Nutrition is estimated.</p>
       </>}
 
       {view === "stores" && <>
-        <p className="data-note">Same basket at each store. Purchases aren’t split.</p>
+        <p className="data-note">One complete basket per store.</p>
         <div>{result.baskets.map(item => <article key={item.storeId} className={`basket-row ${item.status === "complete" && item.storeId === result.recommendedStoreId ? "is-recommended" : ""}`}>
           <header><h2><Icon name="basket" />{storeName(item.storeId)}</h2>{item.status === "complete" && <strong>{formatMoney(item.total)}</strong>}</header>
           {item.status === "complete" ? <>
@@ -138,7 +138,7 @@ function FeasiblePlan({ result, stores, recipes, ingredients, products, onEdit }
         {result.ingredientReuse.length > 0 && <details className="disclosure reuse-list"><summary>Ingredient reuse</summary>{result.ingredientReuse.map(item => <p key={item.ingredientId}>{ingredientName(item.ingredientId)} · {item.recipeIds.length} recipes · {item.packagesAvoided} packages avoided · {formatMoney(item.estimatedSavings)} {basisLabel.toLowerCase()} savings versus separate meal purchases.</p>)}</details>}
       </>}
     </section>
-    {(view === "meals" || view === "stores") && <p className="result-footnote">{result.optimality === "best-found" ? "Best plan found. Search may be incomplete." : "Best plan within the searched catalog."}</p>}
+    {(view === "meals" || view === "stores") && <p className="result-footnote">{result.optimality === "best-found" ? "Best plan found. Search may be incomplete." : "Best within the searched recipes."}</p>}
     <Notices items={[...result.explanations, ...result.notices]} />
     <div className="flow-actions"><button className="button button-secondary" onClick={onEdit}>Edit preferences</button></div>
   </>;

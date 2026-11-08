@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import type { Recipe } from "@/contracts";
 
-export type IconName = "arrow" | "pin" | "receipt" | "spark" | "basket" | "check" | "leaf" | "bowl" | "list";
+export type IconName = "arrow" | "pin" | "receipt" | "basket" | "check" | "leaf" | "bowl" | "list";
 
 /** ShopMate's original line icons. The surrounding control supplies the accessible name. */
 export function Icon({ name, className = "" }: { name: IconName; className?: string }) {
@@ -9,7 +9,6 @@ export function Icon({ name, className = "" }: { name: IconName; className?: str
     arrow: <path d="M4 12h15M13 5l7 7-7 7" />,
     pin: <><path d="M20 10c0 6-8 11-8 11S4 16 4 10a8 8 0 1 1 16 0Z" /><circle cx="12" cy="10" r="2.5" /></>,
     receipt: <path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3ZM9 8h6M9 12h6M9 16h2" />,
-    spark: <path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5L12 3ZM20 2v4M18 4h4" />,
     basket: <path d="m3 9 3 12h12l3-12H3Zm4 0 5-7 5 7M9 13v4M15 13v4" />,
     check: <path d="m5 12 4 4L19 6" />,
     leaf: <path d="M20 3C9 2 2 7 5 15c7 7 15 0 15-12ZM5 20l10-11" />,
@@ -22,16 +21,16 @@ export function Icon({ name, className = "" }: { name: IconName; className?: str
 /** Original vector groceries; no outside artwork or animation library. */
 export function GroceryTote({ className = "" }: { className?: string }) {
   return <svg className={`grocery-tote ${className}`} viewBox="0 0 560 540" fill="none" aria-hidden="true" focusable="false">
-    <circle cx="289" cy="272" r="219" fill="#E6ECD9" />
-    <path d="M60 245C13 130 164 52 265 75M472 361c67-50 65-150 12-201" stroke="#819576" strokeWidth="2" strokeDasharray="5 9" strokeLinecap="round" />
+    <path d="M85 187C94 77 219 20 328 62c117-37 221 76 184 188 39 143-68 235-179 211C177 514 35 418 79 310c-35-46-37-84 6-123Z" fill="#F4CFAC" />
+    <ellipse cx="287" cy="470" rx="196" ry="40" fill="#BFD6E6" />
     <ellipse cx="287" cy="490" rx="178" ry="15" fill="#254D38" opacity=".1" />
     <g className="art-float-slow" stroke="#254D38" strokeWidth="3" strokeLinejoin="round">
-      <path d="M163 298 112 142c-12-37-7-66 12-73 21-8 40 13 50 46l55 159Z" fill="#E8AE68" />
+      <path d="M163 298 112 142c-12-37-7-66 12-73 21-8 40 13 50 46l55 159Z" fill="#EEB25E" />
       <path d="m126 109 32-7m-20 43 32-8m-20 44 32-8m-19 44 32-8" stroke="#AF6C3E" strokeWidth="8" strokeLinecap="round" />
     </g>
     <g className="art-float" stroke="#254D38" strokeWidth="3" strokeLinejoin="round">
       <path d="m339 265 39-117 27 4-12 131Z" fill="#9CB77E" />
-      <path d="M371 175c-32 11-53-15-44-39-30-22-15-58 16-58 1-40 49-52 68-22 30-15 61 7 55 35 35 20 20 65-14 66-8 35-53 41-66 12Z" fill="#57805A" />
+      <path d="M371 175c-32 11-53-15-44-39-30-22-15-58 16-58 1-40 49-52 68-22 30-15 61 7 55 35 35 20 20 65-14 66-8 35-53 41-66 12Z" fill="#53964D" />
       <path d="m378 144 17-42m-6 18-29-12m28 32 35-18" stroke="#9CB77E" strokeLinecap="round" />
     </g>
     <g transform="rotate(10 289 235)" stroke="#254D38" strokeWidth="3" strokeLinejoin="round">
@@ -40,12 +39,12 @@ export function GroceryTote({ className = "" }: { className?: string }) {
       <path d="M286 211h31v34h-31z" fill="#C6D9E0" stroke="none" /><path d="M301 215c-14 16-12 22 0 22s14-6 0-22Z" fill="#FBFAEF" stroke="none" />
     </g>
     <g transform="rotate(-16 405 235)" stroke="#254D38" strokeWidth="3" strokeLinejoin="round">
-      <path d="M393 185c19-11 42 0 36 23l-25 90c-3 8-10 10-14 0l-23-82c-5-18 8-31 26-31Z" fill="#ED9966" />
+      <path d="M393 185c19-11 42 0 36 23l-25 90c-3 8-10 10-14 0l-23-82c-5-18 8-31 26-31Z" fill="#F79942" />
       <path d="M393 186c-25-20-18-42-4-34 0-26 23-20 19 0 20-10 28 8-15 34Z" fill="#719A63" />
       <path d="m377 217 15 5m9 22 15-6m-28 30 11 3" stroke="#B76440" strokeLinecap="round" />
     </g>
     <g stroke="#254D38" strokeWidth="3" strokeLinejoin="round">
-      <path d="m143 258 16 197c2 20 14 29 34 29h184c20 0 33-10 35-29l16-197H143Z" fill="#F4DDA9" />
+      <path d="m143 258 16 197c2 20 14 29 34 29h184c20 0 33-10 35-29l16-197H143Z" fill="#F6D46D" />
       <path d="m143 258 30 17h225l30-17M173 275l12 209m213-209-12 209" stroke="#BFA773" />
       <path d="M221 296v-62c0-76 125-76 125 0v62" stroke="#254D38" strokeWidth="13" strokeLinecap="round" />
       <path d="M221 296v-62c0-76 125-76 125 0v62" stroke="#FCF8E9" strokeWidth="6" strokeLinecap="round" />
@@ -54,14 +53,15 @@ export function GroceryTote({ className = "" }: { className?: string }) {
       <text x="286" y="411" fill="#FFF8E8" stroke="none" textAnchor="middle" fontSize="25" fontWeight="750" fontFamily="inherit" letterSpacing="-1">shopmate.</text>
     </g>
     <g className="art-float" transform="translate(68 365)" stroke="#254D38" strokeWidth="3" strokeLinejoin="round">
-      <path d="M6 35C-4 7 18-6 37 4 58-11 80 4 78 28c14 27-8 53-31 48C24 86 0 65 6 35Z" fill="#DA7254" />
+      <path d="M6 35C-4 7 18-6 37 4 58-11 80 4 78 28c14 27-8 53-31 48C24 86 0 65 6 35Z" fill="#EB724E" />
       <path d="m36 9-15 9 21-2 14 10-6-17 10-9-19 5-7-14Z" fill="#648B58" /><path d="M19 32c-3 7-3 11-1 15" stroke="#F9BD9E" strokeWidth="5" strokeLinecap="round" />
+      <circle cx="33" cy="40" r="2.5" fill="#254D38" stroke="none" /><circle cx="53" cy="40" r="2.5" fill="#254D38" stroke="none" /><path d="M35 52q8 8 16 0" strokeWidth="2.5" strokeLinecap="round" />
     </g>
     <g className="art-float-slow" transform="translate(424 340) rotate(25)" stroke="#254D38" strokeWidth="3">
-      <path d="M0 30C-8 7 17-9 34-4c20-11 52 8 46 32 5 22-20 38-40 32C18 66-4 51 0 30Z" fill="#F2CE69" />
+      <path d="M0 30C-8 7 17-9 34-4c20-11 52 8 46 32 5 22-20 38-40 32C18 66-4 51 0 30Z" fill="#F4CC42" />
       <path d="M38 0c1-16 9-27 24-26-1 17-10 28-24 26Z" fill="#72966A" /><path d="M13 20c2-8 7-12 14-13" stroke="#FFF0AE" strokeWidth="5" strokeLinecap="round" />
+      <circle cx="34" cy="28" r="2.5" fill="#254D38" stroke="none" /><circle cx="51" cy="28" r="2.5" fill="#254D38" stroke="none" /><path d="M35 39q7 7 14 0" strokeWidth="2.5" strokeLinecap="round" />
     </g>
-    <g stroke="#638060" strokeWidth="3" strokeLinecap="round"><path d="m79 297 3 15m-10-6 16-3M466 245l3 15m-10-6 16-3M263 40v17m-8-8h16" /></g>
   </svg>;
 }
 

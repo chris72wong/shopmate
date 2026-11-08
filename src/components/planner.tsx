@@ -12,7 +12,7 @@ import { formatMoney } from "@/lib/format";
 
 import { PlanResults } from "./plan-results";
 import { Counter, LoadingState, Notices, SectionHeading } from "./planner-ui";
-import { GroceryTote, Icon, MealArt } from "@/components/grocery-art";
+import { Icon } from "@/components/grocery-art";
 
 interface PlannerProps { catalogVersion: string; recipes: Recipe[]; ingredients: Ingredient[]; products: ProductPackage[]; initialMode?: DataMode; initialCountry?: Country }
 const steps = ["Location", "Stores", "Preferences", "Plan", "Results"];
@@ -29,6 +29,7 @@ export function Planner({ catalogVersion, recipes, ingredients, products, initia
   const previousStep = useRef(state.step);
   const { country, mode, preferences, discovery, step } = state;
   const currency = currencyForCountry(country ?? "CA");
+  const pricingUnavailable = state.pricing?.stores.some(store => store.status === "unavailable") ?? false;
 
   useEffect(() => () => request.current?.abort(), []);
   useEffect(() => {
@@ -104,16 +105,13 @@ export function Planner({ catalogVersion, recipes, ingredients, products, initia
         <button className="button button-primary" onClick={() => go(step === 2 ? (discovery ? 2 : 1) : 4)}>{step === 2 ? (discovery ? "Edit stores" : "Edit location") : "Edit plan"}</button>
         <button className="text-button" onClick={() => step === 2 ? (discovery ? checkPricing() : discover()) : optimize()}>Try again</button>
       </div>
-      {step === 2 && mode === "live" && <Link className="sample-link" href={`/demo?country=${country}`}>Explore the separate sample experience <span aria-hidden="true">↗</span></Link>}
+      {step === 2 && mode === "live" && <Link className="sample-link" href={`/demo?country=${country}`}>Try demo</Link>}
     </section>
   );
 
   return (
     <div className="planner app-width">
       <aside className="planner-aside">
-        <p className="eyebrow">A FRESH WAY TO PLAN</p>
-        <h2>A little plan.<br />A lot to love.</h2>
-        <p className="aside-description">Your stores, your budget, your meals. Let’s bring it all together.</p>
         <nav className="journey-nav" aria-label="Planning progress">
           <ol>{steps.map((label, index) => {
             const number = index + 1;
@@ -121,18 +119,16 @@ export function Planner({ catalogVersion, recipes, ingredients, products, initia
             return <li key={label} className={number <= step ? "reached" : ""}><button aria-label={`${number}. ${label}`} aria-current={number === step ? "step" : undefined} disabled={!reachable} onClick={() => go(number)}><span className="journey-number">{number < step ? <Icon name="check" /> : `0${number}`}</span><span className="journey-label">{label}</span></button></li>;
           })}</ol>
         </nav>
-        <GroceryTote className="aside-art" /><p className="aside-caption handwritten">good things are in the bag.</p>
       </aside>
       <div className="planner-workspace">
       <div className="flow-topline">
-        {step > 1 ? <button className="back-button" onClick={() => go(step - 1)} aria-label="Back to previous step">Back</button> : <span><Icon name="spark" /> Your next good meal starts here</span>}
-        <span className="step-count">STEP 0{step} <span>/ 05</span></span>
+        {step > 1 ? <button className="back-button" onClick={() => go(step - 1)} aria-label="Back to previous step">Back</button> : <span />}
+        <span className="step-count">{step} / 5</span>
       </div>
-      {mode === "demo" && <div className="sample-notice"><span><Icon name="spark" /> Demo mode · fictional stores · illustrative prices · {currency}</span><Link href="/plan">Exit demo</Link></div>}
+      {mode === "demo" && <div className="sample-notice"><span>Demo · fictional stores · illustrative prices</span><Link href="/plan">Exit</Link></div>}
       <div className="planner-main" key={step} aria-busy={busy}>
         {step === 1 && <>
-          <div className="intro-tag"><Icon name="pin" /> {mode === "demo" ? "A taste of ShopMate" : "First, your neighbourhood"}</div>
-          <SectionHeading title="Where do you shop?">{mode === "demo" ? "Choose a country to explore fictional stores and sample meal plans. No location needed." : "Find grocery stores around you. Then we’ll make a plan that fits your life."}</SectionHeading>
+          <SectionHeading title="Where do you shop?" />
           <form onSubmit={discover} noValidate>
             <fieldset className="country-field">
               <legend className="sr-only">Choose your country</legend>
@@ -140,7 +136,7 @@ export function Planner({ catalogVersion, recipes, ingredients, products, initia
                 {([ ["CA", "Canada", "CAD"], ["US", "United States", "USD"] ] as const).map(([value, label, code]) => (
                   <label className={`country-option ${country === value ? "is-selected" : ""}`} key={value}>
                     <input type="radio" name="country" value={value} checked={country === value} onChange={() => { cancelRequest(); dispatch({ type: "country", country: value }); }} />
-                    <span className="country-symbol" aria-hidden="true">{value === "CA" ? "✳" : "★"}</span><span>{label}<small>{code}</small></span><span className="country-check" aria-hidden="true">{country === value && <Icon name="check" />}</span>
+                    <span>{label}<small>{code}</small></span><span className="country-check" aria-hidden="true">{country === value && <Icon name="check" />}</span>
                   </label>
                 ))}
               </div>
@@ -148,21 +144,21 @@ export function Planner({ catalogVersion, recipes, ingredients, products, initia
             {country && mode === "live" && <div className="location-fields">
               <label className="field-label" htmlFor="postal-code">{country === "CA" ? "Postal code" : "ZIP code"}</label>
               <input className="text-input postal-input" id="postal-code" autoComplete="postal-code" value={state.postalCode} maxLength={16} placeholder={country === "CA" ? "M5V 2T6" : "02108"} aria-invalid={!!validation} aria-describedby={validation ? "location-error location-help" : "location-help"} onChange={event => { cancelRequest(); dispatch({ type: "location", postalCode: event.target.value, radiusKm: state.radiusKm }); }} />
-              <p className="small-note" id="location-help">Used for this search. Your location isn’t saved in your browser.</p>
+              <p className="small-note" id="location-help">Your location isn’t saved.</p>
               <div className="radius-row"><label htmlFor="radius">Search radius</label><select id="radius" value={state.radiusKm} onChange={event => { cancelRequest(); dispatch({ type: "location", postalCode: state.postalCode, radiusKm: Number(event.target.value) }); }}>{[1, 5, 10, 25, 50].map(radius => <option key={radius} value={radius}>{radius} km</option>)}</select></div>
             </div>}
             <p className="field-error" id="location-error" role={validation ? "alert" : undefined}>{validation}</p>
             <div className="flow-actions"><button type="submit" className="button button-primary" disabled={!country}>{mode === "demo" ? "View sample stores" : "Find stores"}<Icon name="arrow" /></button></div>
           </form>
-          {mode === "live" && <><Link className="sample-link" href="/demo">Just looking? Try the sample experience <span aria-hidden="true">↗</span></Link><p className="location-coverage small-note">Live prices depend on verified store coverage. Sample prices are always labeled.</p></>}
+          {mode === "live" && <Link className="sample-link" href="/demo">Try demo</Link>}
         </>}
 
         {step === 2 && <>
-          {!error && <SectionHeading title="Choose your stores">{!busy && discovery?.stores.length ? "Pick up to 3 stores. We’ll compare one complete shopping basket at each." : undefined}</SectionHeading>}
-          {busy && <LoadingState title={discovery ? "Checking available prices…" : "Finding your grocery spots…"} description={discovery ? "Looking for ingredient coverage at your selected stores." : "Gathering stores for your search. Good things are on the way."} />}
+          {!error && <SectionHeading title={busy ? (discovery ? "Checking prices…" : "Finding stores…") : "Choose stores"}>{!busy && discovery?.stores.length ? "Select up to 3." : undefined}</SectionHeading>}
+          {busy && <LoadingState label={discovery ? "Checking prices" : "Finding stores"} />}
           {errorPanel}
           {!busy && !error && discovery && <>
-            <p className="data-note">{mode === "demo" ? "Illustrative prices · fictional stores" : "Real stores · prices require verified branch coverage"}</p>
+            {mode === "live" && <p className="data-note">Prices require verified store coverage.</p>}
             <div className="store-list">{discovery.stores.map(store => (
               <article className={`store-row ${state.storeIds.includes(store.id) ? "is-selected" : ""}`} key={store.id}>
                 <label className="store-choice">
@@ -176,23 +172,23 @@ export function Planner({ catalogVersion, recipes, ingredients, products, initia
               </article>
             ))}</div>
             {discovery.mode === "live" && <div className="google-attribution"><Image src="/google-maps-logo.svg" alt="Google Maps" width={100} height={18} unoptimized />{discovery.attributions.map((item, index) => <span key={index}>{safeExternalUrl(item.uri) ? <a href={safeExternalUrl(item.uri)} target="_blank" rel="noreferrer">{item.displayName}</a> : item.displayName}</span>)}</div>}
-            {discovery.stores.length === 0 && <div className="empty-state"><span className="state-icon"><Icon name="pin" /></span><h2>No stores in this search</h2><p>A wider radius or another location might do the trick.</p><button className="button button-secondary" onClick={() => go(1)}>Edit search</button></div>}
+            {discovery.stores.length === 0 && <div className="empty-state"><span className="state-icon"><Icon name="pin" /></span><h2>No stores found</h2><p>Try a wider radius.</p><button className="button button-secondary" onClick={() => go(1)}>Edit search</button></div>}
             <Notices items={discovery.notices} />
             {!!discovery.stores.length && <div className="flow-actions"><button className="button button-primary" disabled={state.storeIds.length === 0} onClick={checkPricing}>Continue{state.storeIds.length > 0 ? ` · ${state.storeIds.length} selected` : ""}</button></div>}
           </>}
         </>}
 
         {step === 3 && <>
-          <SectionHeading title="Make it your kind of good." >A few preferences help us put the right meals on your table.</SectionHeading>
-          {state.pricing && <div className="pricing-check" aria-label="Selected store pricing"><div className="pricing-check-title"><Icon name="receipt" /><strong>Your store price check</strong></div>{state.pricing.stores.map(store => <p key={store.storeId}>
+          <SectionHeading title="Your preferences" />
+          {state.pricing && <details className="disclosure pricing-check" aria-label="Selected store pricing" open={pricingUnavailable}><summary>Store prices<span>{pricingUnavailable ? "Some unavailable" : mode === "demo" ? "Illustrative" : "Verified quotes"}</span></summary>{state.pricing.stores.map(store => <p key={store.storeId}>
             <strong>{discovery?.stores.find(item => item.id === store.storeId)?.name}</strong>{" · "}
-            {store.status === "unavailable" ? store.message : `${store.basis === "verified" ? "Verified" : "Illustrative"} prices · ${store.offers.length} package prices available${store.missingIngredientIds.length ? ` · ${store.missingIngredientIds.length} ingredients without prices` : ""}`}
-          </p>)}<p>A plan needs prices for every ingredient it uses. Prices are checked again when you create it.</p></div>}
+            {store.status === "unavailable" ? store.message : `${store.basis === "verified" ? "Verified" : "Illustrative"}${store.missingIngredientIds.length ? ` · ${store.missingIngredientIds.length} unpriced ingredients` : ""}`}
+          </p>)}</details>}
           <form onSubmit={event => { event.preventDefault(); validatePreferences(4); }} noValidate>
             <Counter label="Household size" value={preferences.servingsPerMeal} min={1} max={8} onChange={servingsPerMeal => changePreferences({ servingsPerMeal })} />
             <div className="budget-field"><label className="field-label" htmlFor="budget">Grocery budget <span>{currency}</span></label>
               <input className="budget-input" id="budget" inputMode="decimal" value={budget} aria-invalid={!!validation} aria-describedby="budget-help preference-error" onChange={event => { setBudget(event.target.value); dispatch({ type: "clear-result" }); setValidation(""); }} />
-              <p className="small-note" id="budget-help">Whole packages for your planned meals.</p>
+              <p className="small-note" id="budget-help">Whole-package costs.</p>
             </div>
             <fieldset className="field-block"><legend>Diet</legend><div className="chip-group">{dietSchema.options.map(diet => <button type="button" className="choice-chip" key={diet} aria-pressed={preferences.dietaryRestrictions.includes(diet)} onClick={() => changePreferences({ dietaryRestrictions: toggleValue(preferences.dietaryRestrictions, diet) })}>{labels[diet]}</button>)}</div></fieldset>
             <details className="disclosure"><summary>Allergens <span>{preferences.excludedAllergens.length || "None"}</span></summary>
@@ -209,11 +205,11 @@ export function Planner({ catalogVersion, recipes, ingredients, products, initia
         </>}
 
         {step === 4 && <>
-          <SectionHeading title="What’s on the menu?">Choose how many meals to plan and what matters most to you.</SectionHeading>
-          <div className="plan-preview"><MealArt kind="bowl" /><div><span className="eyebrow">A PLAN WITH YOUR NAME ON IT</span><p>{preferences.servingsPerMeal} servings per meal.<br />{formatMoney(preferences.weeklyBudget)} to work with.</p></div></div>
+          <SectionHeading title="Plan your meals" />
+          <div className="plan-summary"><span>{preferences.servingsPerMeal} servings per meal</span><strong>{formatMoney(preferences.weeklyBudget)} budget</strong></div>
           <Counter label="Number of meals" value={preferences.mealCount} min={1} max={14} onChange={mealCount => changePreferences({ mealCount })} />
           <fieldset className="field-block"><legend>Priority</legend><div className="objective-options">
-            {([ ["balanced", "A little of everything", "Balance cost, estimated nutrition and ingredient reuse."], ["minimize-cost", "Make my budget go further", "Prioritize the lowest complete basket cost."], ["maximize-nutrition", "Put nutrition first", "Prioritize estimated nutrition within your budget."] ] as const).map(([value, label, description]) => <label className="objective-row" key={value}><span><strong>{label}</strong><small>{description}</small></span><input type="radio" name="objective" value={value} checked={preferences.objective === value} onChange={() => changePreferences({ objective: value })} /></label>)}
+            {([ ["balanced", "Balanced"], ["minimize-cost", "Lowest cost"], ["maximize-nutrition", "Nutrition"] ] as const).map(([value, label]) => <label className="objective-row" key={value}><span>{label}</span><input type="radio" name="objective" value={value} checked={preferences.objective === value} onChange={() => changePreferences({ objective: value })} /></label>)}
           </div></fieldset>
           <details className="disclosure plan-review"><summary>Your choices</summary><dl>
             <div><dt>Budget</dt><dd>{formatMoney(preferences.weeklyBudget)}</dd></div>
@@ -223,11 +219,11 @@ export function Planner({ catalogVersion, recipes, ingredients, products, initia
             {preferences.nutritionPriorities.length > 0 && <div><dt>Nutrition</dt><dd>Prefer more protein</dd></div>}
           </dl><button className="text-button" onClick={() => go(3)}>Edit preferences</button></details>
           <p className="field-error" role={validation ? "alert" : undefined}>{validation}</p>
-          <div className="flow-actions"><button className="button button-primary" onClick={optimize}>Create my meal plan <Icon name="spark" /></button></div>
+          <div className="flow-actions"><button className="button button-primary" onClick={optimize}>Create plan <Icon name="arrow" /></button></div>
         </>}
 
         {step === 5 && <>
-          {busy ? <><SectionHeading title="A little meal magic…" /><LoadingState title="Bringing your plan together" description="Checking meals, whole-package costs and your preferences. One thoughtful basket at a time." /><button className="text-button" onClick={() => go(4)}>Cancel and review</button></> : error ? errorPanel : state.result ? <PlanResults result={state.result} stores={discovery?.stores ?? []} recipes={recipes} ingredients={ingredients} products={products} onEdit={() => go(3)} /> : <><SectionHeading title="Your plan" /><button className="button button-primary" onClick={() => go(4)}>Review plan</button></>}
+          {busy ? <><SectionHeading title="Planning meals…" /><LoadingState label="Creating your meal plan" /><button className="text-button" onClick={() => go(4)}>Cancel</button></> : error ? errorPanel : state.result ? <PlanResults result={state.result} stores={discovery?.stores ?? []} recipes={recipes} ingredients={ingredients} products={products} onEdit={() => go(3)} /> : <><SectionHeading title="Your plan" /><button className="button button-primary" onClick={() => go(4)}>Review plan</button></>}
         </>}
       </div>
       </div>
