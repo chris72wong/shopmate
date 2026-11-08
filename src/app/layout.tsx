@@ -7,7 +7,7 @@ const dmSans = localFont({ src: "./fonts/dm-sans.ttf", variable: "--font-app", w
 
 export const metadata: Metadata = {
   title: { default: "ShopMate", template: "%s · ShopMate" },
-  description: "Your groceries, your budget, your meals. Discover grocery stores, compare available prices, and bring your next meal plan together with ShopMate.",
+  description: "Fresh AI meal ideas for your household, combined into one practical grocery list. Swap meals, check your pantry, and shop with retailer search links.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

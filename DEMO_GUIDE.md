@@ -1,53 +1,51 @@
-# ShopMate morning demo
+# ShopMate — two-minute demo
 
-## Launch
+ShopMate turns personalized Gemini meals into one actionable grocery list. Its differentiator is deterministic ingredient consolidation plus single-meal swaps that immediately update the list. No fictional grocery facts are used in the main journey.
 
-Use Node.js 24 and npm in this repository:
+## Run
+
+Use Node 24 and the existing npm lockfile. The final review server is on http://127.0.0.1:3111/plan. If it has stopped:
 
 ```powershell
-git switch codex/demo-ready
 npm ci
-npm run dev
+npm run build
+npm start -- --hostname 127.0.0.1 --port 3111
 ```
 
-Open http://localhost:3000/demo?country=US. No API keys or environment variables are needed. If dependencies are already installed, skip `npm ci`. For production: stop the dev server, run `npm run build`, then `npm start`. The agent's review server uses http://127.0.0.1:3107/demo?country=US while this session remains running.
+For development use `npm run dev` and http://localhost:3000/plan. Stop this checkout's server before rebuilding.
 
-## Reliable 60–90-second walkthrough
+Configure server-only `GEMINI_API_KEY` in `.env.local`. The configured key was live-tested with `gemini-3.5-flash-lite`. Optional `GOOGLE_MAPS_API_KEY` enables nearby grocers using Geocoding and Places API (New). `GOOGLE_GENAI_API_KEY` is also accepted for Gemini. Never use a `NEXT_PUBLIC_` name or commit credentials. No Share-A-Cart credential is configured.
 
-1. **0–15 seconds:** Open the US demo. Say: “ShopMate turns meal choices into complete grocery purchases, with whole packages and a real budget constraint.” Click **View sample stores**, keep all three selected, then **Continue**.
-2. **15–30 seconds:** Keep **2 people**, **USD 80**, and no dietary restrictions. Click **Let’s pick meals**. Keep **5 meals** and choose **Nourish more**. Click **Create plan**.
-3. **30–45 seconds:** The sample result is **USD 37.48**, with **USD 42.52 left**. Open a meal to show scaled ingredients and method. The optimizer allows repeated recipes; this scenario chooses five chicken-and-broccoli pasta meals.
-4. **45–60 seconds:** Click **Stores**. Complete identical-meal baskets are Cedar **USD 37.48**, Orchard **USD 43.66**, Clover **USD 49.48**. The displayed comparison is **USD 6.18** versus Orchard. Explain that these are illustrative comparisons, not actual discounts.
-5. **60–75 seconds:** Click **Shopping list**, then **Package details**. Show whole-package purchases versus quantities used and leftovers. Check an item and **Copy list**. The list follows the selected store and its actual package total.
-6. **75–90 seconds:** Click **Edit preferences**, change the exact budget to **20.00**, continue, and **Create plan**. The nutrition-priority plan now uses lentil soup at **USD 14.04**, leaving **USD 5.96**. The budget changes the computed meal choice, rather than just a sentence in a response.
+## Recording walkthrough
 
-Use the remaining 30 seconds of a two-minute video to explain ingredient aggregation, integer-cent arithmetic and hard dietary constraints. No LLM provides prices, calculations or optimization.
+1. **0:00–0:15:** Open `/plan`. Choose Canada; enter St. Catharines postal code `L2R 5L3`. Continue.
+2. **0:15–0:35:** Move the household slider and return it to 2. Leave the budget at CAD $100 and choose 3 meals. Select Vegetarian if desired. Explain that the budget guides ideas; actual grocery prices are unavailable.
+3. **0:35–0:55:** Create meals. These are live Gemini requests, so allow a few seconds. Show distinct meals and open one recipe's full-household ingredients and cooking instructions. Food art is explicitly an illustration.
+4. **0:55–1:15:** Swap one meal. The other two stay in place. Open Grocery list: overlapping ingredients combine and quantities update. Different measurement/preparation states remain separate rather than being converted by guesswork.
+5. **1:15–1:40:** Check off a pantry ingredient. Copy remaining, then download the `.txt`. Both omit checked groceries. Open Shop ingredient to show a genuine Walmart Canada search URL.
+6. **1:40–2:00:** Optionally find nearby grocers: actual Google store/address/distance and Maps attribution. Close with the value: meals, one usable list, and a shopping handoff without manually adding up recipes.
 
-## Optional second scenario
+For a US recording choose United States and Buffalo ZIP `14201`; the budget is USD and searches target Walmart US/Kroger. Test generation before recording. If the provider returns a temporary error, use the visible retry; no sample meals are silently substituted.
 
-CA demo: 2 people, CAD 40, Vegan, exclude peanuts, 5 meals, **A bit of everything**. Expected single-store total **CAD 18.54**, split-store total **CAD 18.50**. The split list assigns carrots/garlic to Orchard and other items to Clover. Check carrots in All assigned stores, filter to Orchard, and observe **1/2 done**. Travel costs are excluded; a four-cent difference does not imply another trip is worthwhile.
+## Verified behavior and honest boundaries
 
-Set a budget of **0.01** to demonstrate a clear **No matching plan** state. Invalid or empty exact budgets keep the user on Preferences. Restore a valid budget before recording the main scenario.
+- Live Gemini: Canadian CAD and US USD households, vegetarian generation and a distinct single-meal replacement passed through the built app. An opt-in direct integration test also passed.
+- Browser: Canadian generation, recipes, swap preserving other meals, ingredient totals, check-offs, successful clipboard and real downloaded text. Mobile list had no horizontal overflow at the browser's effective 375 CSS-pixel width. Canadian Google discovery returned an actual St. Catharines grocer with official attribution.
+- Retailer search routes: Walmart Canada, Walmart US and Kroger. These are searches, not matched product links or carts. See docs/SHARE_A_CART.md.
+- `npm run verify`: lint, strict types, 706 passing tests (6 opt-in tests skipped), production build and 38 production HTTP smoke checks.
+- Recipes are AI-generated suggestions. Common dietary conflicts are rejected, but brand ingredients/cross-contact and cooking correctness require user review. No nutrition guarantees, observed grocery prices, savings, inventory, delivery, package purchase totals or checkout carts are claimed.
+- There is no Share-A-Cart integration: application authentication and regional retailer search/cart access remain unavailable/unverified. No real cart was created.
+- Meal/checklist state is in browser memory and resets on refresh. Copy/download preserves a usable list. The legacy `/demo` is separately labeled fictional/illustrative and is not used by the main workflow.
 
-## What has been verified
+## Re-run checks
 
-- `npm run verify`: lint, strict types, **629 tests passed**, **5 opt-in tests skipped**, production build, **35 actual HTTP checks**.
-- Actual production browser journeys for CAD and USD; vegan/peanut controls; tight-budget failure; purchase-strategy and store views; shopping-list checks across filters; copying; package usage details; narrow responsive layout with no horizontal overflow in the inspected list.
-- Production HTTP confirms the USD 80 → USD 20 nutrition-priority scenario above, with exhaustive catalog search. No warnings/errors appeared in inspected browser console logs.
-- Read-only optimizer audit additionally compared package costs against 500 deterministic brute-force cases.
+```powershell
+npm run verify
+# With the production server running: four real Gemini calls plus currency validation
+node scripts/live-meal-check.mjs http://127.0.0.1:3111
+# Optional single real-model test; may incur normal provider charges
+$env:SHOPMATE_RUN_GEMINI_LIVE='1'
+node --env-file=.env.local node_modules/vitest/vitest.mjs run tests/meal-live.test.ts
+```
 
-## Honest limitations and setup
-
-All demo stores are fictional and all demo prices are **illustrative**, independent CAD/USD fixtures. Nutrition/allergen metadata is estimated; users must check real package labels. Prices exclude taxes, fees, deposits, travel and stock changes. A plan covers the requested meal slots and servings, not a complete daily diet.
-
-The catalog has 14 recipes and permits repeats. Balanced/cost priorities can favor batch cooking; no minimum variety is promised. Large searches can be capped, and the UI labels best-found/incomplete results accordingly. Shopping checks are held in the current results view; refreshing/replanning or switching purchase strategies resets them. There is no account, database, checkout or public deployment.
-
-Live Google discovery uses `GOOGLE_MAPS_API_KEY`; verified retailer pricing requires the provider credentials and reviewed mappings in docs/PRICING.md (`KROGER_CLIENT_ID`, `KROGER_CLIENT_SECRET`, `REEF_KEY`, `SHOPMATE_PRICING_STORES`, `SHOPMATE_PRICING_PRODUCTS` as applicable). Full credentialed real-price planning was not verified in this delivery. Missing services stay explicit and never silently become demo results. Do not configure live services for the recording; use the explicit demo.
-
-Installation reported eight moderate dependency advisories; a fresh production-only audit request failed at the registry endpoint. No dependency versions were changed.
-
-## Review and integrate
-
-The deliverable is on `codex/demo-ready`; main was preserved. Inspect `git diff main...codex/demo-ready` and `git log main..codex/demo-ready`. After review, integrate with your normal merge workflow (for example, from a clean main checkout: `git merge --no-ff codex/demo-ready`). Nothing was automatically merged or deployed. Use `git rev-parse codex/demo-ready` for the final commit.
-
-The user subsequently authorized pushing `codex/demo-ready` to the existing ShopMate origin, superseding the earlier keep-local decision. Main remains unchanged. See AGENT_HANDOFF.md for the historical approval restriction.
+The default suite and HTTP smoke checks make no live Gemini calls. Provider failure, malformed/truncated output, dietary conflicts, stale/cancelled responses, currency mismatches and missing-key behavior have automated coverage. Browser observation included a temporary provider error followed by successful retry; generation availability depends on Google.

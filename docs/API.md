@@ -1,5 +1,17 @@
 # Shared API contract — version 1
 
+## Primary meal-to-grocery API — November 8 rescue
+
+`POST /api/meals` is additive, using the v1 success/error envelope, no-store headers and existing error codes. Executable schemas and types are in `src/contracts/meal-plan.ts`; older v1/v2 semantics are unchanged. The primary `/plan` journey no longer requires retailer-price coverage.
+
+Request: `{ location: { country, postalCode }, budget: { amountCents, currency }, householdSize, mealCount, dietaryRestrictions, excludedAllergens, highProtein, avoidMealNames?, ingredientConventions? }`. Postal syntax uses the shared location schema. Currency must match country; household is 1–8, meal count 1–7, budget 100–1,000,000 integer cents. Avoid names contains at most 30 previous names. Conventions contains at most 175 ingredient objects with `quantity` omitted, giving replacement meals the existing list's naming/measurement conventions. A swap sends `mealCount: 1` with existing names to avoid, replaces only the requested meal, and recalculates the list. Units are never converted implicitly if a response still differs.
+
+Success: `{ source: "gemini", model: "gemini-3.5-flash-lite", meals, notices }`. Each meal has `id`, `name`, `description`, `servings`, `ingredients`, `instructions`, `prepMinutes`, `dietaryCategory`. Each ingredient has `id`, `name`, positive `quantity`, `unit: "g" | "ml" | "each"`, `preparation: "dry" | "drained" | "edible" | "as-sold"`, and `category`. Quantities cover the full household; do not scale twice. Generated ingredient IDs are independent of the legacy priced catalog.
+
+Server-only `GEMINI_API_KEY` (or `GOOGLE_GENAI_API_KEY`) authenticates native HTTPS requests to Google's documented generateContent endpoint. Structured JSON is validated with Zod and checked for count, servings, repeated names and obvious dietary/allergen conflicts. A 55-second provider deadline covers fetch/body decoding. No automatic billable retries or sample fallback. Quota maps to 429, missing/denied credentials to 503, other provider/validation errors to sanitized 502.
+
+The model receives country, never postal code. Budget and high protein guide recipes; no prices, stock, nutrition guarantees, package coverage or budget feasibility are returned. Consolidation merges equivalent names only with matching unit/preparation, preserving pantry ingredients. Retailer URLs are search pages, not product matches or checkout carts. Cross-contact and unfamiliar ingredients are not fully modeled; check product labels.
+
 > Integration update — November 8, 2026: the latest visual frontend and pricing backend are merged on main. The browser consumes v2 automatic store selection, official Kroger quotes and complete mixed-store plans alongside single-store comparisons. The sample journey works in CAD/USD. Credentialed Google CA/US discovery passed; retailer credentials and reviewed mappings remain absent, so complete live-price planning is unverified. See [INTEGRATION.md](INTEGRATION.md) for verification and [PRICING.md](PRICING.md) for setup. Earlier foundation/recovery observations below are historical.
 
 Updated November 7, 2026. Authoritative v1 definitions remain in `src/contracts/`. The additive [v2 verified-pricing contract](#v2-verified-pricing-contract) is implemented in `src/contracts/pricing-v2.ts` and `/api/v2/*`. Source access, actual live trials, configuration and remaining credential gates are recorded in [PRICING.md](PRICING.md). V1 field shapes remain unchanged; illustrative optimization is restricted to explicit demo mode.

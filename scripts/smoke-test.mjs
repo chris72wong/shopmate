@@ -12,7 +12,7 @@ const port = address.port;
 await new Promise((resolve, reject) => probe.close((error) => error ? reject(error) : resolve()));
 const origin = `http://127.0.0.1:${port}`;
 const server = spawn(process.execPath, ["node_modules/next/dist/bin/next", "start", "--hostname", "127.0.0.1", "--port", String(port)], {
-  cwd: process.cwd(), env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1", GOOGLE_MAPS_API_KEY: "", REEF_KEY: "", KROGER_CLIENT_ID: "", KROGER_CLIENT_SECRET: "", SHOPMATE_PRICING_STORES: "[]", SHOPMATE_PRICING_PRODUCTS: "[]" }, stdio: ["ignore", "pipe", "pipe"], windowsHide: true,
+  cwd: process.cwd(), env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1", GEMINI_API_KEY: "", GOOGLE_GENAI_API_KEY: "", GOOGLE_MAPS_API_KEY: "", REEF_KEY: "", KROGER_CLIENT_ID: "", KROGER_CLIENT_SECRET: "", SHOPMATE_PRICING_STORES: "[]", SHOPMATE_PRICING_PRODUCTS: "[]" }, stdio: ["ignore", "pipe", "pipe"], windowsHide: true,
 });
 let output = "";
 let spawnError;
@@ -46,11 +46,14 @@ try {
   const home = await (await get("/")).text();
   assert(home.includes("Good food."));
   assert(home.includes('href="/plan"'), "The homepage must link to the planner");
-  assert(home.includes("Find your stores") && home.includes("Compare your options") && home.includes("Plan your meals"));
+  assert(home.includes("Make it yours") && home.includes("One clever grocery list") && home.includes("Ready for your next shop"));
+  assert(!home.includes("Recipes within your budget"), "No unevidenced budget guarantee");
   assert(!home.includes("/photos/") && !home.includes("Photo credits"), "Replaced stock photos must not return");
   const planner = await (await get("/plan")).text();
   assert(planner.includes("Choose your country"));
   assert(planner.includes("Canada")); assert(planner.includes("United States"));
+  assert(planner.includes("Where’s your kitchen?") || planner.includes("Where&#x27;s your kitchen?"));
+  assert(!planner.includes("fictional stores"), "The primary planner cannot load fictional retailer data");
   const cssPath = home.match(/href="([^"]+\.css(?:\?[^"]*)?)"/)?.[1];
   assert(cssPath, "The home page must load generated CSS");
   const css = await (await get(cssPath.replaceAll("&amp;", "&"))).text();
@@ -65,6 +68,12 @@ try {
   await get("/this-page-does-not-exist", 404);
   const health = await (await get("/api/health")).json(); assert.equal(health.data.capabilities.optimization, true);
   assert.equal(health.data.capabilities.liveDiscovery, true);
+  const mealInput = { location: { country: "CA", postalCode: "L2R 5L3" }, budget: { amountCents: 10000, currency: "CAD" }, householdSize: 2, mealCount: 3, dietaryRestrictions: [], excludedAllergens: [], highProtein: false };
+  const noGemini = await post("/api/meals", mealInput, 503);
+  assert.equal(noGemini.ok, false); assert.equal(noGemini.error.code, "provider-not-configured");
+  assert(!("data" in noGemini), "Unavailable Gemini cannot return substitute meals");
+  await post("/api/meals", { ...mealInput, budget: { amountCents: 10000, currency: "USD" } }, 422);
+  await post("/api/meals", { ...mealInput, householdSize: 9 }, 422);
   await post("/api/stores", { mode: "live", location: { country: "US", postalCode: "14201" } }, 503);
   await post("/api/stores", { mode: "demo", location: { country: "CA", postalCode: "invalid" } }, 422);
   const malformed = await fetch(origin + "/api/stores", { method: "POST", body: "{", signal: AbortSignal.timeout(5000) });

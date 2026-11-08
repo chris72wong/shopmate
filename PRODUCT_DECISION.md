@@ -1,18 +1,13 @@
-# ShopMate product decision
+# ShopMate: meals into groceries
 
-Preserve ShopMate as a budget-aware meal and grocery planner. The existing illustrated five-step journey and deterministic optimizer already provide the strongest achievable demonstration; an unrelated pivot would discard working computation and design.
+November 8 rescue decision: make the primary experience a genuine Gemini-powered meal planner with deterministic ingredient consolidation, individual meal swaps, a checkable grocery list, copy/download and verified regional retailer search links. Preserve ShopMate's illustrations and theme. Remove retailer-price availability as a prerequisite for meal planning.
 
-The differentiator is whole-package optimization: scale recipe quantities to the household, consolidate shared ingredients, buy integer packages, enforce budget/dietary/exclusion constraints, and compare complete single-store and split-store purchases. Outputs include exact cents, package leftovers, ingredient reuse and explainable same-meal price comparisons. No LLM performs arithmetic or selects prices.
+Gemini 3.5 Flash-Lite creates structured original recipes for the household, budget intention and dietary preferences. Zod and server-side dietary checks reject malformed or obviously incompatible output. Budget is guidance, never an invented price or an assurance that groceries fit the budget.
 
-The dependable hackathon path is the explicit demo, using fictional stores and illustrative CAD/USD prices. Live discovery and verified-price adapters stay available, with honest errors and explicit demo entry when coverage is unavailable. Credentialed real-price planning is not a demo prerequisite or a completed claim.
+ShopMate's differentiator is the continuously recalculated shopping list: merge shared ingredients across meals while preserving units and dry/drained/edible states; swap one meal without regenerating the others; mark groceries already available; copy or download shopping quantities and search genuine retailer websites. No price, inventory, savings, matched product or cart is fabricated.
 
-Acceptance criteria:
+Share-A-Cart requires an application credential or interactive approval unavailable in this checkout. Authenticated retailer support and Canadian cart capability remain unverified. Ship honest search links. See [the investigation](docs/SHARE_A_CART.md).
 
-- Complete the CA and US demo journeys without credentials.
-- Changing household, budget or dietary choices changes actual calculated results.
-- Totals equal package-line sums; quantities and currencies remain consistent.
-- Budget failures and truncated searches remain distinct; unavailable baskets have no total.
-- Compare purchase strategies, inspect recipes and package details, and use a checkable/copyable shopping list.
-- Pass repository verification and inspect the production experience in a browser.
+Google discovery stays optional and separate. Legacy `/demo` and v1/v2 optimizer APIs remain explicitly illustrative or evidence-gated, and are not the main journey. No new backend, dependency, pricing-feed speculation or broad architecture rewrite is needed.
 
-Intentionally defer nationwide live pricing, scraping, accounts, checkout, travel routing, tax/fee estimates and nutrition guarantees. Repeated meals are allowed; results optimize the curated catalog, not every possible meal.
+Credentialed Gemini verification requires server-side `GEMINI_API_KEY`; absence must produce an explicit error with no sample fallback. See [the handoff](AGENT_HANDOFF.md) for actual checks and remaining limits.

@@ -1,10 +1,10 @@
 # ShopMate
 
-**Eat better. Spend smarter.** A grocery comparison and meal planning MVP for UB Hacking 2026.
+**Good food. Less fuss.** AI meal ideas turned into a practical grocery list for UB Hacking 2026.
 
-ShopMate discovers eligible major grocery chains in Canada and the US, automatically selects the three closest returned banners, and plans meals with whole-package costs, dietary constraints, recipes and shopping lists. The illustrated planner supports both single-store comparisons and complete purchases split across selected stores. The explicit demo works without credentials using fictional stores and illustrative prices.
+ShopMate uses **Gemini 3.5 Flash-Lite** to generate original, structured meals for your household and dietary preferences. It combines shared ingredients with deterministic quantity arithmetic, lets you swap individual meals, tracks what you already have, and exports a consolidated grocery list with genuine Canadian or US retailer search links. Optional Google Maps discovery finds actual nearby grocers.
 
-For the tested hackathon walkthrough, exact expected totals and limitations, read [DEMO_GUIDE.md](DEMO_GUIDE.md). [PRODUCT_DECISION.md](PRODUCT_DECISION.md) explains the focused product and [AGENT_HANDOFF.md](AGENT_HANDOFF.md) records the latest verification and branch handoff.
+For the hackathon walkthrough and verification limits, read [DEMO_GUIDE.md](DEMO_GUIDE.md). [PRODUCT_DECISION.md](PRODUCT_DECISION.md) explains the focused product and [AGENT_HANDOFF.md](AGENT_HANDOFF.md) records actual checks and branch handoff.
 
 The historical recovery review is saved in [PLAN.md](PLAN.md). [docs/API.md](docs/API.md) documents the implemented v1 and v2 routes; [docs/INTEGRATION.md](docs/INTEGRATION.md) records local merges and verification. Live pricing requires authorized retailer access and reviewed ingredient/package mappings. Unsupported stores and missing prices remain unavailable; successful discovery does not establish price coverage.
 
@@ -17,9 +17,9 @@ npm ci
 npm run dev
 ```
 
-Open [localhost:3000](http://localhost:3000). The demo at [localhost:3000/demo](http://localhost:3000/demo) requires no environment variables. Stop the dev server with Ctrl+C before a production verification run.
+Set server-only `GEMINI_API_KEY` in `.env.local`, then open [localhost:3000](http://localhost:3000). The primary planner is `/plan`. Stop the dev server with Ctrl+C before production verification. Missing or rejected credentials produce an explicit error; there is no sample fallback.
 
-The visual planner includes animated household figures, a budget slider with exact entry, illustrated food preferences and meal selectors. Real retailer cards optionally load banner-specific Brandfetch logos. Set `NEXT_PUBLIC_BRANDFETCH_CLIENT_ID` to your own public Logo API client ID and restart/rebuild; without it, local initials appear. Demo stores keep fictional icons. See [logo setup, service terms and verification](docs/RETAILER-LOGOS.md).
+The planner includes a household slider with animated figures, a CAD/USD budget-guidance slider, dietary choices, single-meal swaps, a checkable list and copy/download. Budget guides recipe ideas; actual prices, product matches, stock, checkout carts and delivery are unavailable. Food visuals are original illustrations, not recipe photographs. Share-A-Cart requires an unavailable application credential; see [the brief investigation](docs/SHARE_A_CART.md).
 
 For live configuration, create `.env.local` only if it does not already exist:
 
@@ -67,6 +67,7 @@ docs/                     API, worktree, and deployment handoffs
 
 ## Current API behavior
 
+- `POST /api/meals`: live structured Gemini recipes, validated against household and dietary preferences. No price claims or sample fallback.
 - `GET /api/health`: `200`, reports which features are implemented.
 - `POST /api/stores`: fictional demo stores or live Google discovery; no live prices in v1.
 - `POST /api/optimize`: illustrative demo planning; live requests must use v2.
@@ -74,7 +75,7 @@ docs/                     API, worktree, and deployment handoffs
 - `/api/v2/plan`: optional one-call discovery, selection and planning; the browser keeps separate steps for reviewing stores and preferences.
 - Invalid JSON returns `400`; schema-invalid requests return `422` with field paths.
 
-There is no silent live-to-demo fallback. Sample price profiles, including those named after real chains, remain **illustrative**. Verified prices require fresh, branch-scoped offers and reviewed package content; incomplete baskets have no comparable total. Demo stores are fictional with no nearby distances. Nutrition is estimated. There is no authentication, payment system, database or LLM. Retailer logos are an optional external image integration; setup illustrations are original local SVGs.
+The legacy `/demo` and optimizer endpoints remain separately labeled sample functionality. They are not used by the primary meal-to-grocery flow. There is no silent live-to-demo fallback. Legacy prices remain **illustrative** unless backed by actual verified offers; demo stores remain fictional. The primary workflow invents no retailer facts and provides no checkout integration. There is no authentication, payment system or database. Setup and meal visuals are original local SVG illustrations.
 
 ## Development handoff
 
