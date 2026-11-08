@@ -17,6 +17,8 @@ npm run dev
 
 Open [localhost:3000](http://localhost:3000). The demo at [localhost:3000/demo](http://localhost:3000/demo) requires no environment variables. Stop the dev server with Ctrl+C before a production verification run.
 
+The visual planner includes animated household figures, a budget slider with exact entry, illustrated food preferences and meal selectors. Real retailer cards optionally load banner-specific Brandfetch logos. Set `NEXT_PUBLIC_BRANDFETCH_CLIENT_ID` to your own public Logo API client ID and restart/rebuild; without it, local initials appear. Demo stores keep fictional icons. See [logo setup, service terms and verification](docs/RETAILER-LOGOS.md).
+
 Optional configuration, for the future live-discovery implementation:
 
 ```powershell
@@ -68,7 +70,7 @@ docs/                     API, worktree, and deployment handoffs
 - `POST /api/optimize`: validates input, then `501 not-implemented` in either mode.
 - Invalid JSON returns `400`; schema-invalid requests return `422` with field paths.
 
-There is no silent live-to-demo fallback. All package prices are **illustrative samples**, including profiles named after real grocery chains. Demo store names/addresses are fictional; no real nearby distances are supplied. Nutrition is estimated. There is no authentication, payment system, database, LLM, or external image dependency.
+There is no silent live-to-demo fallback. All package prices are **illustrative samples**, including profiles named after real grocery chains. Demo store names/addresses are fictional; no real nearby distances are supplied. Nutrition is estimated. There is no authentication, payment system, database or LLM. Retailer logos are an optional external image integration; setup illustrations are original local SVGs.
 
 ## Development handoff
 
