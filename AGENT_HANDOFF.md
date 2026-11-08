@@ -14,7 +14,7 @@ Five-step CA/US planner, sample catalog, dietary/exclusion filters, household sc
 
 Implementation, verification and local commits are complete. No further feature work is required for the chosen demonstration. Exact walkthrough and limitations: DEMO_GUIDE.md.
 
-**User decision: keep the commits local. Do not push this branch unless the user gives a new explicit instruction.** No approval request remains pending. All local work is preserved.
+**Updated user instruction: push the changes to the existing ShopMate origin.** This supersedes the earlier keep-local decision. The delivery branch is `codex/demo-ready`; main remains unchanged.
 
 Earlier push attempts were rejected twice by automatic approval review because it considered the GitHub destination unverified for transmitting repository source/documentation. No network write occurred and no bypass was attempted. Existing origin is `https://github.com/chris72wong/shopmate.git`; the earlier read-only check confirmed its main matched baseline `8c2b06b683f440f1826e6888d349191ab02d9a68` and returned no remote demo-ready branch. This is historical verification, not a request to retry.
 
