@@ -1,5 +1,6 @@
 import { z } from "zod";
-import type { ApiErrorCode, OptimizationRequest, OptimizationResult, StoreDiscoveryResult, StoreV2, CoreOptimizationResult, PriceBasis, OptimizationResultV2, PricingResultV2 } from "@/contracts";
+import type { ApiErrorCode, OptimizationRequest, OptimizationResult, StoreDiscoveryResult, StoreDiscoveryResultV2, CoreOptimizationResult, PriceBasis, OptimizationResultV2, PricingResultV2 } from "@/contracts";
+export type { StoreDiscoveryResultV2 } from "@/contracts";
 import { countrySchema, currencySchema, moneySchema } from "@/contracts";
 
 const quantity = z.object({ quantity: z.number().nonnegative(), unit: z.enum(["g", "ml", "each"]) });
@@ -19,16 +20,18 @@ const discoverySchema = z.object({
   ])), attributions: z.array(z.object({ provider: z.literal("google-maps"), displayName: z.string(), uri: z.string() })), notices: z.array(z.string()),
 });
 export const discoveryViewSchema: z.ZodType<StoreDiscoveryResult> = discoverySchema;
-export type StoreDiscoveryResultV2 = Omit<StoreDiscoveryResult, "stores"> & { stores: StoreV2[] };
 const pricingV2 = z.discriminatedUnion("status", [
   pricing.options[0],
-  z.object({ status: z.literal("verified-capable"), providerId: z.enum(["reef-loblaws", "reef-kroger"]), channel: z.enum(["in-store", "pickup", "delivery"]) }),
+  z.object({ status: z.literal("verified-capable"), providerId: z.enum(["reef-loblaws", "reef-kroger", "kroger"]), channel: z.enum(["in-store", "pickup", "delivery"]) }),
   pricing.options[1].extend({ reason: z.string() }),
 ]);
 export const discoveryV2ViewSchema: z.ZodType<StoreDiscoveryResultV2> = discoverySchema.extend({ stores: z.array(z.discriminatedUnion("source", [
   discoverySchema.shape.stores.element.options[0].extend({ pricing: pricingV2 }),
   discoverySchema.shape.stores.element.options[1].extend({ pricing: pricingV2 }),
-])) });
+])), selectedStoreIds: z.array(z.string()).max(3), selection: z.object({ strategy: z.enum(["nearest-distinct-banners", "demo-order"]), limit: z.literal(3),
+  distanceBasis: z.literal("straight-line").nullable(), exhaustive: z.literal(false), candidateLimit: z.literal(20).nullable() }) }).refine(result =>
+  new Set(result.selectedStoreIds).size === result.selectedStoreIds.length && result.selectedStoreIds.every(id => result.stores.some(store => store.id === id)),
+  "Automatic selection must reference distinct returned stores.");
 const optimizationBase = z.object({ mode: z.enum(["live", "demo"]), country: countrySchema, currency: currencySchema,
   pricingBasis: z.literal("illustrative"), search: z.object({ evaluatedCombinations: z.number().int().nonnegative(), exhaustive: z.boolean() }), notices: z.array(z.string()) });
 const line = z.object({ ingredientId: z.string(), productId: z.string(), required: quantity, packageCount: z.number().int().positive(),
@@ -50,7 +53,7 @@ const optimizationSchema = z.discriminatedUnion("status", [
 ]);
 export const optimizationViewSchema: z.ZodType<OptimizationResult> = optimizationSchema;
 
-const providerId = z.enum(["reef-loblaws", "reef-kroger"]);
+const providerId = z.enum(["reef-loblaws", "reef-kroger", "kroger"]);
 const channel = z.enum(["in-store", "pickup", "delivery"]);
 const product = z.object({ id: z.string(), ingredientId: z.string(), name: z.string(), label: z.string(), content: quantity, countries: z.array(countrySchema) });
 const promotion = z.object({ type: z.enum(["unconditional-sale", "loyalty", "multi-buy", "coupon", "unknown"]), price: moneySchema,
@@ -71,7 +74,13 @@ export const pricingViewSchema: z.ZodType<PricingResultV2> = z.object({ mode: z.
     z.object({ status: z.literal("available"), storeId: z.string(), basis: z.literal("verified"), missingIngredientIds: z.array(z.string()), offers: z.array(verifiedOffer) }),
     z.object({ status: z.literal("unavailable"), storeId: z.string(), reason: z.enum(["unsupported-store", "provider-not-configured", "provider-error", "rate-limited", "no-usable-offers"]), message: z.string() }),
   ])) });
+const mixedStorePlan = optimizationSchema.options[0].pick({ meals: true, requirements: true, estimatedTotalNutrition: true, budgetRemaining: true, optimality: true, total: true }).extend({
+  basis: z.enum(["illustrative", "verified"]), lines: z.array(line.extend({ storeId: z.string() })).min(1),
+  stores: z.array(z.object({ storeId: z.string(), total: moneySchema })).min(1).max(3),
+  savings: z.object({ comparedToStoreId: z.string(), amount: moneySchema }).nullable(),
+});
 const v2Metadata = { pricingBasis: z.enum(["illustrative", "verified"]), catalogVersion: z.string(), optimizerVersion: z.string(), pricing: pricingViewSchema,
+  mixedStorePlan: mixedStorePlan.nullable().optional(),
   search: z.object({ evaluatedCombinations: z.number().int().nonnegative(), exhaustive: z.boolean(), evaluationLimit: z.number().int().positive(), candidateRecipeIds: z.array(z.string()) }) };
 export const optimizationV2ViewSchema: z.ZodType<OptimizationResultV2> = z.discriminatedUnion("status", [
   optimizationSchema.options[0].extend({ ...v2Metadata, baskets: z.array(z.discriminatedUnion("status", [
@@ -92,7 +101,39 @@ export function pricingMatchesRequest(result: PricingResultV2, request: PricingS
 export function planV2MatchesRequest(result: OptimizationResultV2, request: OptimizationRequest & { catalogVersion: string }): boolean {
   return result.pricingBasis === (request.mode === "demo" ? "illustrative" : "verified") && result.catalogVersion === request.catalogVersion
     && pricingMatchesRequest(result.pricing, request) && planMatchesRequest(result, request)
-    && (result.status !== "feasible" || result.baskets.every(basket => basket.status !== "complete" || basket.basis === result.pricingBasis));
+    && (result.status !== "feasible" || result.baskets.every(basket => basket.status !== "complete" || basket.basis === result.pricingBasis))
+    && mixedPlanMatchesRequest(result, request);
+}
+
+function mixedPlanMatchesRequest(result: OptimizationResultV2, request: OptimizationRequest): boolean {
+  const plan = result.mixedStorePlan;
+  if (!plan) return true;
+  const currency = request.preferences.weeklyBudget.currency;
+  if (plan.basis !== result.pricingBasis || (plan.optimality === "proven" && !result.search.exhaustive)
+    || plan.total.currency !== currency || plan.budgetRemaining.currency !== currency
+    || plan.total.amountCents > request.preferences.weeklyBudget.amountCents
+    || plan.budgetRemaining.amountCents !== request.preferences.weeklyBudget.amountCents - plan.total.amountCents
+    || plan.meals.length !== request.preferences.mealCount || plan.meals.some((meal, index) => meal.slot !== index || meal.servings !== request.preferences.servingsPerMeal)
+    || new Set(plan.stores.map(store => store.storeId)).size !== plan.stores.length
+    || plan.stores.some(store => !request.storeIds.includes(store.storeId) || store.total.currency !== currency
+      || !plan.lines.some(line => line.storeId === store.storeId)
+      || store.total.amountCents !== plan.lines.filter(line => line.storeId === store.storeId).reduce((sum, line) => sum + line.subtotal.amountCents, 0))
+    || plan.total.amountCents !== plan.stores.reduce((sum, store) => sum + store.total.amountCents, 0)) return false;
+  const channels = new Set<string>();
+  for (const line of plan.lines) {
+    const quote = result.pricing.stores.find(store => store.storeId === line.storeId);
+    if (!plan.stores.some(store => store.storeId === line.storeId) || quote?.status !== "available" || quote.basis !== plan.basis
+      || line.unitPrice.currency !== currency || line.subtotal.currency !== currency
+      || line.subtotal.amountCents !== line.unitPrice.amountCents * line.packageCount
+      || !plan.requirements.some(item => item.ingredientId === line.ingredientId && item.unit === line.required.unit)
+      || line.purchased.unit !== line.required.unit || line.leftover.unit !== line.required.unit
+      || Math.abs(line.purchased.quantity - line.required.quantity - line.leftover.quantity) > 0.00001) return false;
+    const offer = quote.offers.find(offer => ("product" in offer ? offer.product.id : offer.productId) === line.productId);
+    if (!offer?.available || offer.price.amountCents !== line.unitPrice.amountCents) return false;
+    if ("provenance" in offer) channels.add(offer.provenance.channel);
+  }
+  if (channels.size > 1 || plan.requirements.some(item => Math.abs(item.quantity - plan.lines.filter(line => line.ingredientId === item.ingredientId).reduce((sum, line) => sum + line.required.quantity, 0)) > 0.00001)) return false;
+  return !plan.savings || (plan.savings.amount.currency === currency && request.storeIds.includes(plan.savings.comparedToStoreId));
 }
 
 const errorSchema = z.object({ code: z.enum(["invalid-json", "invalid-request", "not-implemented", "provider-not-configured", "provider-error", "not-found", "rate-limited", "internal-error"]),

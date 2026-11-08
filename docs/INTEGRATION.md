@@ -1,5 +1,24 @@
 # ShopMate integration verification
 
+## Latest local integration — November 8, 2026
+
+Started on clean local `main` at `16f6278`. Inspected branches, recent commits and all worktrees. The backend (`98da`), latest visual frontend (`56aa`) and earlier market frontend (`fa55`) were clean, with completed work committed. No source checkout was changed or deleted; no reset, force-push, deployment or remote push was performed.
+
+- Backend first: `codex/backend-real-pricing-auto-stores`, `e2286a4f965c4cbb35ac10025d7732f688986879`, merged as `c7e6dab`.
+- Frontend second: `codex/visual-planner-logos`, `5cf672407fecb158b3db232c2f5e252349c4628b`, merged as `01ddc80`.
+- The earlier `codex/frontend-market-refresh` tip `6220751` was already an ancestor of main. Its artwork and improvements remain intact. Both new merges completed without textual conflicts; `.env.example` merged cleanly. Existing `.env.local` was preserved.
+
+Integration fixes connect server-owned automatic store selection to the illustrated store cards while retaining eligible alternatives and manual overrides. Frontend discovery/offer validators accept official `kroger` identities and preserve mixed-store results. Results support separately optimized single-store and across-store meals, recipes, nutrition and shopping lists; every split line retains its actual branch and package quantities. Assigned store subtotals are labeled separately from comparable full baskets. Complete mixed plans work even when no single store has full coverage. Response checks reject mismatched branches, currencies, package totals, missing requirements and false exhaustive claims.
+
+Real Google testing found that an untyped address component may omit its empty `types` array. The shared discovery/details parser now accepts that omission while still requiring a typed country match; synthetic regression tests cover both cases. Official Kroger observations now copy only timestamp fields from the HTTP wrapper, preventing an undocumented raw `data` payload from reaching the pricing contract. No prices, branch mappings or ingredient equivalences were invented.
+
+- Final `npm run verify` passed with normal filesystem/loopback access: lint, strict typecheck, **628 tests passed / 5 opt-in probes skipped across 30 files**, production webpack build, and **29 HTTP smoke requests**. The earlier restricted run stopped at a Windows `EPERM` creating generated `.next` files; it is not counted as passing.
+- Opt-in network probes with `.env.local` loaded: **Google CA/US discovery and authoritative store resolution passed**, and **public Ontario Bidou RSS passed**; three retailer-credential probes skipped. The initial Google failure was resolved and the probes rerun successfully. No Google payloads or precise locations were saved or logged. Schema diagnosis used field paths only.
+- Production Chrome checks passed on desktop and at **390 × 844**: live Canadian discovery with automatic selection, real store information, Google logo/Maps links and honest unavailable pricing; voluntary demo entry; all three fictional stores preselected; Canadian household/exact budget/vegan/peanut/protein controls; complete meals and recipes; single/across-store switching; branch-labeled groceries and checkbox completion. The US mobile journey passed location, automatic demo stores, pricing, budget slider, preferences, plan and USD shopping list. Inspected mobile controls/results/recipes/lists stayed within the viewport. The inspected US browser console had no messages. Mobile emulation was reset and DevTools closed afterward. No physical print, credentialed retailer basket or live Brandfetch delivery was verified.
+- `npm audit --omit=dev` passed with **0 vulnerabilities**. Installation still reports eight moderate development-tool advisory entries; no unrelated dependency upgrades were applied.
+- This checkout has no Reef/Kroger credentials and both reviewed branch/product mapping arrays are empty. **No retailer currently has functional live optimizer pricing in this configuration.** Official Kroger US and Reef Loblaws-family CA / Kroger-family US adapters are implemented and synthetically tested; they require the access and mappings in [PRICING.md](PRICING.md). Bidou's regional ads are never treated as branch basket prices. Brandfetch logos require the owner's public client ID; otherwise initials are used.
+- Local integration is ready to push after review. Public live deployment still needs verified retailer coverage, applicable display/comparison rights, Terms/Privacy pages, key restrictions and deployment-wide quota controls from [DEPLOYMENT.md](DEPLOYMENT.md).
+
 ## Latest local merge — November 7, 2026
 
 Performed on local `main` in `C:/Users/myste/OneDrive/Desktop/shopmate/shopmate`, starting from clean commit `e07ff1e`. Both source worktrees were also clean.

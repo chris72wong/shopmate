@@ -1,6 +1,6 @@
 # Shared API contract — version 1
 
-> Integration update — November 7, 2026: the committed frontend and backend are merged on main. The browser now uses v2 discovery/pricing/optimization; the complete sample journey works. Google/Reef credentials and reviewed retailer mappings are absent, so credentialed end-to-end coverage is unverified. Earlier foundation/recovery observations below are historical. See [INTEGRATION.md](INTEGRATION.md) for final verification and [PRICING.md](PRICING.md) for setup.
+> Integration update — November 8, 2026: the latest visual frontend and pricing backend are merged on main. The browser consumes v2 automatic store selection, official Kroger quotes and complete mixed-store plans alongside single-store comparisons. The sample journey works in CAD/USD. Credentialed Google CA/US discovery passed; retailer credentials and reviewed mappings remain absent, so complete live-price planning is unverified. See [INTEGRATION.md](INTEGRATION.md) for verification and [PRICING.md](PRICING.md) for setup. Earlier foundation/recovery observations below are historical.
 
 Updated November 7, 2026. Authoritative v1 definitions remain in `src/contracts/`. The additive [v2 verified-pricing contract](#v2-verified-pricing-contract) is implemented in `src/contracts/pricing-v2.ts` and `/api/v2/*`. Source access, actual live trials, configuration and remaining credential gates are recorded in [PRICING.md](PRICING.md). V1 field shapes remain unchanged; illustrative optimization is restricted to explicit demo mode.
 
@@ -200,7 +200,7 @@ V2 preserves country/currency, ingredient/recipe IDs, units, preference fields, 
 | Endpoint | Request | Success `data` |
 | --- | --- | --- |
 | `GET /api/v2/catalog?country=CA` | Exactly one required `country=CA\|US` | `{ catalogVersion, country, currency, ingredients: Ingredient[], recipes: Recipe[], products: ProductPackage[] }`; local curated metadata, estimated nutrition, no provider prices |
-| `POST /api/v2/stores` | Existing `StoreDiscoveryRequest` fields/limits | Existing `StoreDiscoveryResult`, except stores use `StoreV2` below; actual branch names/addresses only from discovery; demo remains separate |
+| `POST /api/v2/stores` | Existing `StoreDiscoveryRequest` fields/limits | `StoreDiscoveryResultV2`: existing discovery plus `selectedStoreIds` and bounded `selection` metadata; stores use `StoreV2`; actual branch data only from discovery; demo remains separate |
 | `POST /api/v2/pricing` | `{ mode, country, storeIds, catalogVersion }`; 1–3 distinct discovered IDs | `PricingResultV2` below, covering the catalog's candidate ingredients; an offer subset does not promise a complete basket |
 | `POST /api/v2/optimize` | Existing `OptimizationRequest` plus required `catalogVersion` | `OptimizationResultV2` below; server independently re-resolves IDs and fetches current offers once for this run |
 | `POST /api/v2/plan` | `{ mode, location, radiusKm?, catalogVersion, preferences, storeIds? }` | `PlanningResultV2`: discover, automatically select and plan; optional override uses eligible IDs from this search; preserve discovery/selection on pricing failure |

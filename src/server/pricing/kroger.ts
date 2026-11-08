@@ -119,7 +119,8 @@ export class KrogerPricingAdapter {
           unitPrice: regular && quantity ? { price: regular, per: quantity } : null,
           availability: item.inventory?.stockLevel === "TEMPORARILY_OUT_OF_STOCK" || item.fulfillment?.inStore === false ? "unavailable"
             : ["HIGH", "LOW"].includes(item.inventory?.stockLevel ?? "") && item.fulfillment?.inStore === true ? "available" : "unknown",
-          channel: "in-store", scope: "branch", priceIsEstimate: item.soldBy?.toUpperCase() !== "UNIT", ...timestamps,
+          channel: "in-store", scope: "branch", priceIsEstimate: item.soldBy?.toUpperCase() !== "UNIT",
+          retrievedAt: timestamps.retrievedAt, expiresAt: timestamps.expiresAt,
           sourceObservedAt: null, providerUpdatedAt: null, sourceUrl } satisfies RetailProductObservation];
       });
     });

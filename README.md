@@ -2,9 +2,9 @@
 
 **Eat better. Spend smarter.** A grocery comparison and meal planning MVP for UB Hacking 2026.
 
-This repository is the **shared foundation**, ready for independent frontend, store-discovery, and optimization worktrees. Start by choosing a country, then enter a validated postal or ZIP code to open the explicitly labeled demo stores. Recipes are available in a collapsed library. Shared contracts, API scaffolds, provider interfaces, and the curated catalog support later implementation. It does not yet search Google or optimize meals; demo stores do not use or retain the entered postal code.
+ShopMate discovers eligible major grocery chains in Canada and the US, automatically selects the three closest returned banners, and plans meals with whole-package costs, dietary constraints, recipes and shopping lists. The illustrated planner supports both single-store comparisons and complete purchases split across selected stores. The explicit demo works without credentials using fictional stores and illustrative prices.
 
-The November 7 recovery review is saved in [PLAN.md](PLAN.md): audited working/mocked/missing features, external access requirements, and a scoped hackathon delivery plan. [docs/API.md](docs/API.md) preserves the current v1 contract and separately proposes v2 for verified branch/product prices. V2 is documentation only; no application behavior changed. Parallel work/worktrees still require explicit user authorization.
+The historical recovery review is saved in [PLAN.md](PLAN.md). [docs/API.md](docs/API.md) documents the implemented v1 and v2 routes; [docs/INTEGRATION.md](docs/INTEGRATION.md) records local merges and verification. Live pricing requires authorized retailer access and reviewed ingredient/package mappings. Unsupported stores and missing prices remain unavailable; successful discovery does not establish price coverage.
 
 ## Run locally
 
@@ -19,13 +19,13 @@ Open [localhost:3000](http://localhost:3000). The demo at [localhost:3000/demo](
 
 The visual planner includes animated household figures, a budget slider with exact entry, illustrated food preferences and meal selectors. Real retailer cards optionally load banner-specific Brandfetch logos. Set `NEXT_PUBLIC_BRANDFETCH_CLIENT_ID` to your own public Logo API client ID and restart/rebuild; without it, local initials appear. Demo stores keep fictional icons. See [logo setup, service terms and verification](docs/RETAILER-LOGOS.md).
 
-Optional configuration, for the future live-discovery implementation:
+For live configuration, create `.env.local` only if it does not already exist:
 
 ```powershell
-Copy-Item .env.example .env.local
+if (!(Test-Path .env.local)) { Copy-Item .env.example .env.local }
 ```
 
-Set `GOOGLE_MAPS_API_KEY` in `.env.local` only when implementing live discovery. The current foundation never calls Google, even if a key is set. Keep the key server-side; `.env.local` is ignored by Git.
+Set server-only `GOOGLE_MAPS_API_KEY` for live Geocoding and Places API (New). For official US Kroger pricing, set `KROGER_CLIENT_ID`, `KROGER_CLIENT_SECRET` and reviewed `SHOPMATE_PRICING_PRODUCTS`; exact branch matching or reviewed bindings are required. Reef adapters additionally require `REEF_KEY` and reviewed `SHOPMATE_PRICING_STORES`. See [pricing setup](docs/PRICING.md). Keep credentials server-side; `.env.local` is ignored by Git.
 
 ## Commands
 
@@ -48,16 +48,16 @@ The smoke script allocates an available loopback port and stops its own server. 
 
 ```text
 src/
-  app/                    App Router shell, read-only demo, and API routes
-    api/{health,stores,optimize}/
-  components/             Shared brand, shell, original SVG art, recipe card
+  app/                    App Router shell, live/demo planner, and API routes
+    api/                  V1 and additive v2 discovery/pricing/planning
+  components/             Illustrated controls, store cards, recipes and lists
   contracts/              Shared domain types, requests/results, Zod schemas
   data/                   14 recipes, 31 ingredients/packages, illustrative prices
   lib/                    Small browser-safe utilities
   server/
-    discovery/            StoreDiscoveryProvider and explicit demo implementation
-    pricing/              GroceryPricingProvider and illustrative implementation
-    optimization/         OptimizationEngine interface; implementation pending
+    discovery/            Google major-grocer discovery and explicit demo
+    pricing/              Official Kroger/Reef adapters, packages and provenance
+    optimization/         Deterministic single/mixed-store package optimization
 tests/                    Contract, catalog, provider, and route regression tests
 scripts/                  Production HTTP smoke checks
 docs/                     API, worktree, and deployment handoffs
@@ -66,11 +66,13 @@ docs/                     API, worktree, and deployment handoffs
 ## Current API behavior
 
 - `GET /api/health`: `200`, reports which features are implemented.
-- `POST /api/stores`: `200` in explicit `demo` mode; `501 not-implemented` for `live`.
-- `POST /api/optimize`: validates input, then `501 not-implemented` in either mode.
+- `POST /api/stores`: fictional demo stores or live Google discovery; no live prices in v1.
+- `POST /api/optimize`: illustrative demo planning; live requests must use v2.
+- `/api/v2/stores`, `/pricing`, `/optimize`: automatic selection, current verified offers or explicit unavailability, complete single/mixed-store plans.
+- `/api/v2/plan`: optional one-call discovery, selection and planning; the browser keeps separate steps for reviewing stores and preferences.
 - Invalid JSON returns `400`; schema-invalid requests return `422` with field paths.
 
-There is no silent live-to-demo fallback. All package prices are **illustrative samples**, including profiles named after real grocery chains. Demo store names/addresses are fictional; no real nearby distances are supplied. Nutrition is estimated. There is no authentication, payment system, database or LLM. Retailer logos are an optional external image integration; setup illustrations are original local SVGs.
+There is no silent live-to-demo fallback. Sample price profiles, including those named after real chains, remain **illustrative**. Verified prices require fresh, branch-scoped offers and reviewed package content; incomplete baskets have no comparable total. Demo stores are fictional with no nearby distances. Nutrition is estimated. There is no authentication, payment system, database or LLM. Retailer logos are an optional external image integration; setup illustrations are original local SVGs.
 
 ## Development handoff
 

@@ -9,7 +9,7 @@ const coordinate = z.object({ latitude: z.number().min(-90).max(90), longitude: 
 const placeSchema = z.object({
   id: z.string().regex(/^[A-Za-z0-9_-]{1,240}$/),
   displayName: z.object({ text: z.string().trim().min(1).max(500) }), formattedAddress: z.string().trim().min(1).max(2000),
-  addressComponents: z.array(z.object({ shortText: z.string().optional(), types: z.array(z.string()) })),
+  addressComponents: z.array(z.object({ shortText: z.string().optional(), types: z.array(z.string()).default([]) })),
   location: coordinate, googleMapsUri: z.string(), types: z.array(z.string()), primaryType: z.string().optional(), businessStatus: z.string().optional(),
   attributions: z.array(z.object({ provider: z.string().min(1), providerUri: z.string() })).optional(),
 });

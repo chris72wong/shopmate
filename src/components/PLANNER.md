@@ -8,6 +8,8 @@ Demo stores remain fictional, prices remain labeled illustrative or verified, an
 
 Pricing preflight keeps users on Stores when every selected store lacks usable offers, with retry and explicit demo recovery. Partial coverage stays visible when continuing. A final pricing-unavailable result offers store selection; budget/dietary failures offer preference editing.
 
+November 8 integration: initialize from server-owned `selectedStoreIds`, preserving eligible alternatives and user overrides. Discovery/offer validators accept official `kroger` quotes. Results offer single-store and across-store strategies; a complete mixed plan remains usable when no single-store basket is complete. Across-store shopping lists retain each line's branch, package quantity, price provenance and assigned store subtotal. Only identical-meal complete baskets support savings. The five-step visual setup and explicit demo/pricing labels are preserved.
+
 `npm run build` uses the supported `--webpack` option because the local Turbopack CSS worker exits before connecting. The preceding design's verification history is retained in Git; the latest merged checks are in `docs/INTEGRATION.md`.
 
 Frontend worktree verification before integration: lint, strict typecheck and 256 tests passed (4 credential-gated tests skipped). The Webpack production build passed, followed by all 27 HTTP smoke requests. Browser checks covered desktop and 320/390px mobile widths, pause/play, postal validation, expandable store prices, CA/US sample plans, comparisons, copying lists and keyboard grocery checks. The production homepage body has 45 words; inspected views had no horizontal overflow or browser warnings/errors. Provider-backed live success remains unverified without credentials.

@@ -44,7 +44,7 @@ export function plannerReducer(state: PlannerState, action: PlannerAction): Plan
     case "location": return { ...state, postalCode: action.postalCode, radiusKm: action.radiusKm,
       discovery: null, pricing: null, storeIds: [], result: null };
     case "discovery": return { ...state, discovery: action.data, postalCode: action.data.mode === "live" ? action.data.location.postalCode : state.postalCode,
-      storeIds: [], pricing: null, result: null };
+      storeIds: "selectedStoreIds" in action.data ? [...action.data.selectedStoreIds] : [], pricing: null, result: null };
     case "store": {
       if (!state.discovery?.stores.some(store => store.id === action.id)) return state;
       const selected = state.storeIds.includes(action.id);

@@ -165,7 +165,7 @@ export function Planner({ catalogVersion, recipes, ingredients, products, initia
         </>}
 
         {step === 2 && <>
-          {!error && <SectionHeading title={busy ? (discovery ? "Checking prices…" : "Finding stores…") : "Your grocery go-tos"}>{!busy && discovery?.stores.length ? "Pick up to 3 to compare." : undefined}</SectionHeading>}
+          {!error && <SectionHeading title={busy ? (discovery ? "Checking prices…" : "Finding stores…") : "Your grocery go-tos"}>{!busy && discovery?.stores.length ? mode === "live" ? "Up to 3 closest returned chains are selected. Change any choice below." : "Three fictional stores are selected. Change any choice below." : undefined}</SectionHeading>}
           {busy && <LoadingState label={discovery ? "Checking prices" : "Finding stores"} />}
           {errorPanel}
           {!busy && !error && discovery && <>

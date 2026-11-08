@@ -6,6 +6,7 @@ import { createRetailPricingService } from "@/server/pricing/service";
 import type { BranchBinding, ProductMapping } from "@/server/pricing/retail-config";
 import { branchBindingSchema, productMappingSchema } from "@/server/pricing/retail-config";
 import { optimizationRequest } from "./fixtures";
+import { optimizationV2ViewSchema, planV2MatchesRequest, pricingViewSchema } from "@/lib/planner-api";
 
 // Entirely synthetic upstream rows. None are live observations or application configuration.
 const start = Date.parse("2026-11-07T12:00:00Z");
@@ -124,6 +125,12 @@ describe("official Kroger production adapter", () => {
     expect(result.budgetRemaining.amountCents).toBe(0);
     expect(result.pricing.stores[0]).toMatchObject({ basis: "verified", offers: expect.arrayContaining([expect.objectContaining({ provenance: expect.objectContaining({ providerId: "kroger" }) })]) });
     expect(result.mixedStorePlan?.total).toEqual(result.total);
+    for (const quote of result.pricing.stores) if (quote.status === "available" && quote.basis === "verified") {
+      for (const offer of quote.offers) expect(offer.observation).not.toHaveProperty("data");
+    }
+    const browserResult = optimizationV2ViewSchema.parse(result);
+    expect(pricingViewSchema.parse(result.pricing).stores[0]).toMatchObject({ status: "available", basis: "verified" });
+    expect(planV2MatchesRequest(browserResult, { ...input, catalogVersion: result.catalogVersion })).toBe(true);
   });
   it("requires reviewed usable-content mappings instead of converting arbitrary search results into ingredients", async () => {
     const { adapter } = setup();
