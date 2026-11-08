@@ -14,7 +14,9 @@ Five-step CA/US planner, sample catalog, dietary/exclusion filters, household sc
 
 Implementation, verification and local commits are complete. No further feature work is required for the chosen demonstration. Exact walkthrough and limitations: DEMO_GUIDE.md.
 
-Push did **not** succeed. Automatic approval review rejected `git push -u origin codex/demo-ready` twice, including after outgoing-file inspection and remote verification. Its stated reason: repository source/documentation would be transmitted to an unverified external destination, and specific authorization for the payload/destination could not be established. No network write occurred. Existing origin is `https://github.com/chris72wong/shopmate.git`; read-only `git ls-remote` confirmed its main is exactly baseline `8c2b06b683f440f1826e6888d349191ab02d9a68`, and no remote demo-ready branch was returned. No bypass was attempted. An explicit approval request for this exact push is pending. After approval or manually in your own terminal, run `git push -u origin codex/demo-ready`, then compare `git rev-parse HEAD` with `git ls-remote origin refs/heads/codex/demo-ready`. All local work is preserved.
+**User decision: keep the commits local. Do not push this branch unless the user gives a new explicit instruction.** No approval request remains pending. All local work is preserved.
+
+Earlier push attempts were rejected twice by automatic approval review because it considered the GitHub destination unverified for transmitting repository source/documentation. No network write occurred and no bypass was attempted. Existing origin is `https://github.com/chris72wong/shopmate.git`; the earlier read-only check confirmed its main matched baseline `8c2b06b683f440f1826e6888d349191ab02d9a68` and returned no remote demo-ready branch. This is historical verification, not a request to retry.
 
 ## Completed reliability work
 
