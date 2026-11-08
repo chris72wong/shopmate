@@ -12,7 +12,7 @@ const port = address.port;
 await new Promise((resolve, reject) => probe.close((error) => error ? reject(error) : resolve()));
 const origin = `http://127.0.0.1:${port}`;
 const server = spawn(process.execPath, ["node_modules/next/dist/bin/next", "start", "--hostname", "127.0.0.1", "--port", String(port)], {
-  cwd: process.cwd(), env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1" }, stdio: ["ignore", "pipe", "pipe"], windowsHide: true,
+  cwd: process.cwd(), env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1", GOOGLE_MAPS_API_KEY: "", REEF_KEY: "", SHOPMATE_PRICING_STORES: "[]", SHOPMATE_PRICING_PRODUCTS: "[]" }, stdio: ["ignore", "pipe", "pipe"], windowsHide: true,
 });
 let output = "";
 let spawnError;
@@ -28,7 +28,7 @@ async function post(path, body, expectedStatus) {
   const response = await fetch(origin + path, { method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body), signal: AbortSignal.timeout(5000) });
   assert.equal(response.status, expectedStatus, `POST ${path}`);
-  assert.equal(response.headers.get("X-ShopMate-Contract-Version"), "1"); checks++;
+  assert.equal(response.headers.get("X-ShopMate-Contract-Version"), path.startsWith("/api/v2/") ? "2" : "1"); checks++;
   return response.json();
 }
 try {
@@ -59,18 +59,39 @@ try {
     assert(result.data.stores.every((store) => store.distanceMeters === null));
   }
   await get("/this-page-does-not-exist", 404);
-  const health = await (await get("/api/health")).json(); assert.equal(health.data.capabilities.optimization, false);
-  await post("/api/stores", { mode: "live", location: { country: "US", postalCode: "14201" } }, 501);
+  const health = await (await get("/api/health")).json(); assert.equal(health.data.capabilities.optimization, true);
+  assert.equal(health.data.capabilities.liveDiscovery, true);
+  await post("/api/stores", { mode: "live", location: { country: "US", postalCode: "14201" } }, 503);
   await post("/api/stores", { mode: "demo", location: { country: "CA", postalCode: "invalid" } }, 422);
   const malformed = await fetch(origin + "/api/stores", { method: "POST", body: "{", signal: AbortSignal.timeout(5000) });
   assert.equal(malformed.status, 400); checks++;
-  await post("/api/optimize", {
+  const plan = await post("/api/optimize", {
     mode: "demo", country: "US", storeIds: ["demo-us-clover"], preferences: {
       weeklyBudget: { amountCents: 8000, currency: "USD" }, mealCount: 5, servingsPerMeal: 2,
       dietaryRestrictions: [], excludedIngredientIds: [], excludedAllergens: [], nutritionPriorities: [], objective: "balanced",
     },
-  }, 501);
+  }, 200);
+  assert.equal(plan.data.status, "feasible"); assert.equal(plan.data.pricingBasis, "illustrative");
+  assert(plan.data.total.amountCents <= 8000); assert.equal(plan.data.total.currency, "USD");
   await post("/api/optimize", {}, 422);
+  for (const country of ["CA", "US"]) {
+    const catalogResponse = await get(`/api/v2/catalog?country=${country}`);
+    assert.equal(catalogResponse.headers.get("X-ShopMate-Contract-Version"), "2");
+    const catalog = (await catalogResponse.json()).data;
+    assert(catalog.catalogVersion); assert(catalog.ingredients.length); assert(catalog.recipes.length);
+    const discovery = await post("/api/v2/stores", { mode: "demo", location: { country, postalCode: country === "CA" ? "M5V 2T6" : "02108" } }, 200);
+    const input = { mode: "demo", country, catalogVersion: catalog.catalogVersion, storeIds: discovery.data.stores.map(store => store.id) };
+    const prices = await post("/api/v2/pricing", input, 200);
+    assert(prices.data.stores.every(store => store.basis === "illustrative"));
+    const result = await post("/api/v2/optimize", { ...input, preferences: { weeklyBudget: { amountCents: 8000, currency: country === "CA" ? "CAD" : "USD" }, mealCount: 2, servingsPerMeal: 2, dietaryRestrictions: [], excludedIngredientIds: [], excludedAllergens: [], nutritionPriorities: [], objective: "balanced" } }, 200);
+    assert.equal(result.data.status, "feasible"); assert.equal(result.data.pricingBasis, "illustrative");
+    assert.equal(result.data.catalogVersion, catalog.catalogVersion); assert(result.data.optimizerVersion);
+    assert(result.data.total.amountCents <= 8000); assert(result.data.search.candidateRecipeIds.length);
+    await post("/api/v2/pricing", { ...input, catalogVersion: "old-catalog" }, 422);
+  }
+  await get("/api/v2/catalog?country=CA&country=US", 422);
+  await get("/api/v2/deals?country=US&province=ON", 422);
+  await post("/api/v2/stores", { mode: "live", location: { country: "US", postalCode: "14201" } }, 503);
   console.log(`Production HTTP smoke checks passed (${checks} requests).`);
 } catch (error) {
   console.error(output);
