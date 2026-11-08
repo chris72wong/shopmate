@@ -1,5 +1,7 @@
 # Shared API contract — version 1
 
+> Integration update — November 7, 2026: the committed frontend and backend are merged on main. The browser now uses v2 discovery/pricing/optimization; the complete sample journey works. Google/Reef credentials and reviewed retailer mappings are absent, so credentialed end-to-end coverage is unverified. Earlier foundation/recovery observations below are historical. See [INTEGRATION.md](INTEGRATION.md) for final verification and [PRICING.md](PRICING.md) for setup.
+
 Updated November 7, 2026. Authoritative v1 definitions remain in `src/contracts/`. The additive [v2 verified-pricing contract](#v2-verified-pricing-contract) is implemented in `src/contracts/pricing-v2.ts` and `/api/v2/*`. Source access, actual live trials, configuration and remaining credential gates are recorded in [PRICING.md](PRICING.md). V1 field shapes remain unchanged; illustrative optimization is restricted to explicit demo mode.
 
 These contracts let frontend and backend work against one interface. Coordinate shared changes with the integrator. All current endpoints are same-origin Next.js route handlers, with JSON payloads and no authentication.

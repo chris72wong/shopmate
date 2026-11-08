@@ -5,19 +5,19 @@ import Link from "next/link";
 import { useEffect, useReducer, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import type { Country, DataMode, Ingredient, Preferences, ProductPackage, Recipe } from "@/contracts";
-import { allergenSchema, currencyForCountry, dietSchema, optimizationRequestSchema, storeDiscoveryRequestSchema } from "@/contracts";
+import { allergenSchema, currencyForCountry, dietSchema, optimizationRequestV2Schema, storeDiscoveryRequestSchema } from "@/contracts";
 import { budgetCents, initialPlanner, plannerReducer, safeExternalUrl, toggleValue } from "@/lib/planner";
-import { discoveryViewSchema, optimizationViewSchema, planMatchesRequest, PlannerApiError, postPlanner } from "@/lib/planner-api";
+import { discoveryV2ViewSchema, optimizationV2ViewSchema, pricingViewSchema, pricingMatchesRequest, planV2MatchesRequest, PlannerApiError, postPlanner } from "@/lib/planner-api";
 import { formatMoney } from "@/lib/format";
 
 import { PlanResults } from "./plan-results";
 import { Counter, Notices, SectionHeading } from "./planner-ui";
 
-interface PlannerProps { recipes: Recipe[]; ingredients: Ingredient[]; products: ProductPackage[]; initialMode?: DataMode; initialCountry?: Country }
+interface PlannerProps { catalogVersion: string; recipes: Recipe[]; ingredients: Ingredient[]; products: ProductPackage[]; initialMode?: DataMode; initialCountry?: Country }
 const steps = ["Location", "Stores", "Preferences", "Plan", "Results"];
 const labels = { "gluten-free": "Gluten-free", "tree-nuts": "Tree nuts", milk: "Milk", egg: "Eggs", fish: "Fish", shellfish: "Shellfish", peanuts: "Peanuts", wheat: "Wheat", soy: "Soy", sesame: "Sesame", vegetarian: "Vegetarian", vegan: "Vegan" };
 
-export function Planner({ recipes, ingredients, products, initialMode = "live", initialCountry }: PlannerProps) {
+export function Planner({ catalogVersion, recipes, ingredients, products, initialMode = "live", initialCountry }: PlannerProps) {
   const [state, dispatch] = useReducer(plannerReducer, initialPlanner(initialMode, initialCountry ?? null));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<PlannerApiError | null>(null);
@@ -53,11 +53,23 @@ export function Planner({ recipes, ingredients, products, initialMode = "live", 
     // Location changes already clear stores. A retry also discards expired provider content.
     dispatch({ type: "location", postalCode: state.postalCode, radiusKm: state.radiusKm });
     try {
-      const data = await postPlanner("/api/stores", payload.data, discoveryViewSchema, controller.signal);
+      const data = await postPlanner("/api/v2/stores", payload.data, discoveryV2ViewSchema, controller.signal);
       if (controller.signal.aborted) return;
       if (data.mode !== mode || data.location.country !== country || data.location.currency !== currency || data.stores.some(store => store.country !== country || store.source !== (mode === "demo" ? "demo" : "google"))) throw new PlannerApiError("invalid-response", "The store response didn’t match your search. Please try again.");
       dispatch({ type: "discovery", data });
     } catch (caught) { if (!controller.signal.aborted) setError(caught instanceof PlannerApiError ? caught : new PlannerApiError("network", "We couldn’t find your stores. Please try again.")); }
+    finally { if (request.current === controller) { setBusy(false); request.current = null; } }
+  }
+  async function checkPricing() {
+    if (!country || !state.storeIds.length) return;
+    cancelRequest(); const controller = new AbortController(); request.current = controller; setBusy(true);
+    const selection = { mode, country, storeIds: state.storeIds, catalogVersion };
+    try {
+      const data = await postPlanner("/api/v2/pricing", selection, pricingViewSchema, controller.signal);
+      if (controller.signal.aborted) return;
+      if (!pricingMatchesRequest(data, selection)) throw new PlannerApiError("invalid-response", "Prices didn’t match your selected stores. Please try again.");
+      dispatch({ type: "pricing", data }); dispatch({ type: "step", step: 3 });
+    } catch (caught) { if (!controller.signal.aborted) setError(caught instanceof PlannerApiError ? caught : new PlannerApiError("network", "Prices couldn’t be checked. Please try again.")); }
     finally { if (request.current === controller) { setBusy(false); request.current = null; } }
   }
   function validatePreferences(nextStep: number) {
@@ -66,14 +78,14 @@ export function Planner({ recipes, ingredients, products, initialMode = "live", 
     changePreferences({ weeklyBudget: { amountCents: cents, currency } }); go(nextStep);
   }
   async function optimize() {
-    const parsed = optimizationRequestSchema.safeParse({ mode, country, storeIds: state.storeIds, preferences });
+    const parsed = optimizationRequestV2Schema.safeParse({ catalogVersion, mode, country, storeIds: state.storeIds, preferences });
     if (!parsed.success) { setValidation(parsed.error.issues[0]?.message ?? "Check your preferences."); return; }
     cancelRequest(); const controller = new AbortController(); request.current = controller;
     dispatch({ type: "clear-result" }); dispatch({ type: "step", step: 5 }); setBusy(true);
     try {
-      const data = await postPlanner("/api/optimize", parsed.data, optimizationViewSchema, controller.signal);
+      const data = await postPlanner("/api/v2/optimize", parsed.data, optimizationV2ViewSchema, controller.signal);
       if (controller.signal.aborted) return;
-      if (!planMatchesRequest(data, parsed.data)) throw new PlannerApiError("invalid-response", "The plan didn’t match your selections and budget. Please try again.");
+      if (!planV2MatchesRequest(data, parsed.data)) throw new PlannerApiError("invalid-response", "The plan didn’t match your selections and budget. Please try again.");
       dispatch({ type: "result", result: data });
     } catch (caught) { if (!controller.signal.aborted) setError(caught instanceof PlannerApiError ? caught : new PlannerApiError("network", "Your plan couldn’t be loaded. Please try again.")); }
     finally { if (request.current === controller) { setBusy(false); request.current = null; } }
@@ -81,12 +93,12 @@ export function Planner({ recipes, ingredients, products, initialMode = "live", 
   const unavailable = error?.code === "not-implemented" || error?.code === "provider-not-configured";
   const errorPanel = error && (
     <section className="error-state" role="alert">
-      <SectionHeading title={unavailable ? (step === 2 ? "Search unavailable" : "Planning unavailable") : error.code === "not-found" ? "Location not found" : "Please try again"} />
-      <p>{unavailable ? (step === 2 ? "Nearby store search isn’t connected yet." : "Meal planning isn’t connected yet.") : error.code === "rate-limited" ? "Too many requests. Try again shortly." : error.message}</p>
+      <SectionHeading title={unavailable ? (step === 2 ? (discovery ? "Pricing unavailable" : "Search unavailable") : "Planning unavailable") : error.code === "not-found" ? "Location not found" : "Please try again"} />
+      <p>{unavailable ? error.message : error.code === "rate-limited" ? "Too many requests. Try again shortly." : error.message}</p>
       {error.details.length > 0 && <ul>{error.details.map((item, index) => <li key={index}>{item.message}</li>)}</ul>}
       <div className="error-actions">
-        <button className="button button-primary" onClick={() => go(step === 2 ? 1 : 4)}>{step === 2 ? "Edit location" : "Edit plan"}</button>
-        <button className="text-button" onClick={() => step === 2 ? discover() : optimize()}>Try again</button>
+        <button className="button button-primary" onClick={() => go(step === 2 ? (discovery ? 2 : 1) : 4)}>{step === 2 ? (discovery ? "Edit stores" : "Edit location") : "Edit plan"}</button>
+        <button className="text-button" onClick={() => step === 2 ? (discovery ? checkPricing() : discover()) : optimize()}>Try again</button>
       </div>
       {step === 2 && mode === "live" && <Link className="sample-link" href={`/demo?country=${country}`}>Try sample stores</Link>}
     </section>
@@ -135,15 +147,15 @@ export function Planner({ recipes, ingredients, products, initialMode = "live", 
 
         {step === 2 && <>
           {!error && <SectionHeading title="Choose your stores">{!busy && discovery?.stores.length ? "Select up to 3" : undefined}</SectionHeading>}
-          {busy && <div className="loading-state" role="status"><span className="spinner" />Finding stores…</div>}
+          {busy && <div className="loading-state" role="status"><span className="spinner" />{discovery ? "Checking prices…" : "Finding stores…"}</div>}
           {errorPanel}
           {!busy && !error && discovery && <>
-            <p className="data-note">Illustrative prices{mode === "live" && " · not branch prices"}</p>
+            <p className="data-note">{mode === "demo" ? "Illustrative prices · fictional stores" : "Real stores · prices require verified branch coverage"}</p>
             <div className="store-list">{discovery.stores.map(store => (
               <article className="store-row" key={store.id}>
                 <label className="store-choice">
                   <span><strong>{store.name}</strong><span className="store-address">{store.address}</span>
-                    {(store.pricing.status === "unavailable" || store.source === "google") && <span className="store-meta">{store.pricing.status === "unavailable" && "Pricing unavailable"}{store.source === "google" && `${store.pricing.status === "unavailable" ? " · " : ""}${(store.distanceMeters / 1000).toFixed(1)} km straight-line`}</span>}
+                    {(store.pricing.status === "unavailable" || store.source === "google") && <span className="store-meta">{store.pricing.status === "unavailable" ? "Pricing unavailable" : store.pricing.status === "verified-capable" ? `Verified pricing supported · ${store.pricing.channel}` : "Illustrative prices"}{store.source === "google" && ` · ${(store.distanceMeters / 1000).toFixed(1)} km straight-line`}</span>}
                   </span>
                   <input type="checkbox" aria-label={`Compare ${store.name}`} checked={state.storeIds.includes(store.id)} disabled={!state.storeIds.includes(store.id) && state.storeIds.length >= 3} onChange={() => dispatch({ type: "store", id: store.id })} />
                 </label>
@@ -153,12 +165,16 @@ export function Planner({ recipes, ingredients, products, initialMode = "live", 
             {discovery.mode === "live" && <div className="google-attribution"><Image src="/google-maps-logo.svg" alt="Google Maps" width={100} height={18} unoptimized />{discovery.attributions.map((item, index) => <span key={index}>{safeExternalUrl(item.uri) ? <a href={safeExternalUrl(item.uri)} target="_blank" rel="noreferrer">{item.displayName}</a> : item.displayName}</span>)}</div>}
             {discovery.stores.length === 0 && <div className="empty-state"><h2>No stores found</h2><p>Try a wider radius or another location.</p><button className="button button-secondary" onClick={() => go(1)}>Edit search</button></div>}
             <Notices items={discovery.notices} />
-            {!!discovery.stores.length && <div className="flow-actions"><button className="button button-primary" disabled={state.storeIds.length === 0} onClick={() => go(3)}>Continue{state.storeIds.length > 0 ? ` · ${state.storeIds.length} selected` : ""}</button></div>}
+            {!!discovery.stores.length && <div className="flow-actions"><button className="button button-primary" disabled={state.storeIds.length === 0} onClick={checkPricing}>Continue{state.storeIds.length > 0 ? ` · ${state.storeIds.length} selected` : ""}</button></div>}
           </>}
         </>}
 
         {step === 3 && <>
           <SectionHeading title="Your preferences" />
+          {state.pricing && <div className="small-note" aria-label="Selected store pricing">{state.pricing.stores.map(store => <p key={store.storeId}>
+            <strong>{discovery?.stores.find(item => item.id === store.storeId)?.name}</strong>{" · "}
+            {store.status === "unavailable" ? store.message : `${store.basis === "verified" ? "Verified" : "Illustrative"} prices · ${store.offers.length} packages · ${store.missingIngredientIds.length} catalog ingredients without prices`}
+          </p>)}<p>A plan needs prices for every ingredient it uses. Prices are checked again when you create it.</p></div>}
           <form onSubmit={event => { event.preventDefault(); validatePreferences(4); }} noValidate>
             <Counter label="Household size" value={preferences.servingsPerMeal} min={1} max={8} onChange={servingsPerMeal => changePreferences({ servingsPerMeal })} />
             <div className="budget-field"><label className="field-label" htmlFor="budget">Grocery budget <span>{currency}</span></label>

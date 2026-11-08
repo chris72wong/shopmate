@@ -1,5 +1,7 @@
 # Vercel release preparation
 
+> Integration update — November 7, 2026: the committed frontend and backend are merged on main. The browser now uses v2 discovery/pricing/optimization; the complete sample journey works. Google/Reef credentials and reviewed retailer mappings are absent, so credentialed end-to-end coverage is unverified. Earlier foundation/recovery observations below are historical. See [INTEGRATION.md](INTEGRATION.md) for final verification and [PRICING.md](PRICING.md) for setup.
+
 The foundation uses standard Next.js App Router/Node route handlers, without a custom server or database. It is structured for Vercel, but this task does not deploy or create a remote repository.
 
 ## Foundation preview

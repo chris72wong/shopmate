@@ -2,14 +2,15 @@
 
 import Image from "next/image";
 import { useState } from "react";
-import type { FeasibleOptimization, Ingredient, OptimizationResult, ProductPackage, Recipe, Store } from "@/contracts";
+import type { CoreOptimizationResult, PriceBasis, Ingredient, OptimizationResult, OptimizationResultV2, ProductPackage, Recipe, Store, StoreV2 } from "@/contracts";
 import { formatMoney } from "@/lib/format";
+import { safeExternalUrl } from "@/lib/planner";
 import { mealPhoto } from "@/lib/meal-photo";
 import { Notices, SectionHeading } from "./planner-ui";
 
 interface ResultProps {
-  result: OptimizationResult;
-  stores: Store[];
+  result: OptimizationResult | OptimizationResultV2;
+  stores: (Store | StoreV2)[];
   recipes: Recipe[];
   ingredients: Ingredient[];
   products: ProductPackage[];
@@ -23,7 +24,7 @@ export function PlanResults(props: ResultProps) {
     <div className="empty-state">
       <p>{result.message}</p>
       {result.status === "incomplete" && <p className="small-note">The search ended early. A plan may still be possible.</p>}
-      {result.status === "infeasible" && result.minimumKnownCost && <p className="small-note">Lowest known cost: {formatMoney(result.minimumKnownCost)} · illustrative</p>}
+      {result.status === "infeasible" && result.minimumKnownCost && <p className="small-note">Lowest known cost: {formatMoney(result.minimumKnownCost)} · {result.pricingBasis === "verified" ? "verified quote" : "illustrative"}</p>}
       <button className="button button-primary" onClick={onEdit}>Edit preferences</button>
     </div>
     <Notices items={result.notices} />
@@ -31,7 +32,7 @@ export function PlanResults(props: ResultProps) {
   return <FeasiblePlan {...props} result={result} />;
 }
 
-function FeasiblePlan({ result, stores, recipes, ingredients, products, onEdit }: ResultProps & { result: FeasibleOptimization }) {
+function FeasiblePlan({ result, stores, recipes, ingredients, products, onEdit }: ResultProps & { result: Extract<CoreOptimizationResult<PriceBasis>, { status: "feasible" }> & { pricing?: OptimizationResultV2["pricing"] } }) {
   const [view, setView] = useState<"meals" | "stores" | "list" | "nutrition">("meals");
   const [basketStoreId, setBasketStoreId] = useState(result.recommendedStoreId);
   const [checked, setChecked] = useState<string[]>([]);
@@ -43,12 +44,19 @@ function FeasiblePlan({ result, stores, recipes, ingredients, products, onEdit }
   const lines = basket?.status === "complete" ? basket.lines : [];
   const keyFor = (index: number) => `${basketStoreId}:${index}`;
   const done = lines.filter((_, index) => checked.includes(keyFor(index))).length;
+  const basisLabel = result.pricingBasis === "verified" ? "Verified quote" : "Illustrative";
+  const quoted = result.pricing?.stores.find(store => store.storeId === basketStoreId);
+  const offers = quoted?.status === "available" && quoted.basis === "verified" ? quoted.offers : [];
+  const recommendedQuote = result.pricing?.stores.find(store => store.storeId === result.recommendedStoreId);
+  const recommendedOffers = recommendedQuote?.status === "available" && recommendedQuote.basis === "verified" ? recommendedQuote.offers : [];
+  const productLabel = (item: ProductPackage | undefined) => item ? (result.pricingBasis === "verified" ? `${item.name} · ${item.label}` : item.label) : undefined;
+  const productFor = (id: string) => offers.find(offer => offer.product.id === id)?.product ?? products.find(item => item.id === id);
   const nutrition = result.estimatedTotalNutrition;
 
   async function copyList() {
-    const text = `${storeName(basketStoreId)} — illustrative shopping list\n` + lines.map(line => {
-      const product = products.find(item => item.id === line.productId);
-      return `${line.packageCount} × ${product?.label ?? ingredientName(line.ingredientId)} — ${formatMoney(line.subtotal)}`;
+    const text = `${storeName(basketStoreId)} — ${basisLabel.toLowerCase()} shopping list\n` + lines.map(line => {
+      const product = productFor(line.productId);
+      return `${line.packageCount} × ${productLabel(product) ?? ingredientName(line.ingredientId)} — ${formatMoney(line.subtotal)}`;
     }).join("\n");
     try { await navigator.clipboard.writeText(text); setCopyState("Copied"); }
     catch { setCopyState("Copy unavailable. Try Print."); }
@@ -56,10 +64,11 @@ function FeasiblePlan({ result, stores, recipes, ingredients, products, onEdit }
 
   return <>
     <SectionHeading title={view === "list" ? "Shopping list" : view === "nutrition" ? "Nutrition" : "Your plan"} />
-    {view !== "nutrition" && <p className="data-note">Illustrative prices</p>}
+    {view !== "nutrition" && <p className="data-note">{result.pricingBasis === "verified" ? "Verified branch quotes · prices may change before checkout" : "Illustrative prices"}</p>}
     {(view === "meals" || view === "stores") && <div className="plan-cost">
       <div className="cost-line"><strong>{formatMoney(result.total)}</strong><span>{formatMoney(result.budgetRemaining)} left</span></div>
       <p>{storeName(result.recommendedStoreId)} · {result.meals.length} meals</p>
+      {recommendedOffers.length > 0 && <p className="small-note">{recommendedOffers[0]!.provenance.channel} · retrieved {new Date(Math.min(...recommendedOffers.map(offer => Date.parse(offer.provenance.retrievedAt)))).toLocaleString()} · excludes taxes, fees and deposits</p>}
     </div>}
     <nav className="result-nav" aria-label="Plan views">
       {([ ["meals", "Meals"], ["stores", "Stores"], ["list", "Shopping list"], ["nutrition", "Nutrition"] ] as const).map(([id, label]) => <button key={id} aria-pressed={view === id} onClick={() => setView(id)}>{label}</button>)}
@@ -90,11 +99,11 @@ function FeasiblePlan({ result, stores, recipes, ingredients, products, onEdit }
         <div>{result.baskets.map(item => <article key={item.storeId} className="basket-row">
           <header><h2>{storeName(item.storeId)}</h2>{item.status === "complete" && <strong>{formatMoney(item.total)}</strong>}</header>
           {item.status === "complete" ? <>
-            <p>{item.storeId === result.recommendedStoreId ? "Lowest complete basket · illustrative" : "Complete basket · illustrative"}</p>
+            <p>{item.storeId === result.recommendedStoreId ? `Lowest complete basket · ${basisLabel.toLowerCase()}` : `Complete basket · ${basisLabel.toLowerCase()}`}</p>
             <button className="text-button" onClick={() => { setBasketStoreId(item.storeId); setCopyState(""); setView("list"); }}>View shopping list</button>
           </> : <><p>Pricing unavailable</p><details className="usage-details"><summary>Missing items</summary><p>{item.missingIngredientIds.map(ingredientName).join(", ")}</p><p>{item.reason}</p></details></>}
         </article>)}</div>
-        {result.basketSavings && <p className="result-footnote">{formatMoney(result.basketSavings.amount)} less than {storeName(result.basketSavings.comparedToStoreId)} for this basket. Illustrative comparison.</p>}
+        {result.basketSavings && <p className="result-footnote">{formatMoney(result.basketSavings.amount)} less than {storeName(result.basketSavings.comparedToStoreId)} for this basket. {basisLabel} comparison.</p>}
       </>}
 
       {view === "list" && <>
@@ -103,17 +112,21 @@ function FeasiblePlan({ result, stores, recipes, ingredients, products, onEdit }
         {(["produce", "grains", "proteins", "dairy", "pantry", "other"] as const).map(category => {
           const group = lines.map((line, index) => ({ line, index })).filter(({ line }) => (ingredients.find(item => item.id === line.ingredientId)?.category ?? "other") === category);
           return group.length ? <div className="grocery-group" key={category}><h3>{category}</h3>{group.map(({ line, index }) => {
-            const product = products.find(item => item.id === line.productId);
+            const product = productFor(line.productId);
             return <div className="grocery-item" key={index}>
               <label className={`grocery-line ${checked.includes(keyFor(index)) ? "is-checked" : ""}`}>
                 <input type="checkbox" checked={checked.includes(keyFor(index))} onChange={() => setChecked(previous => previous.includes(keyFor(index)) ? previous.filter(key => key !== keyFor(index)) : [...previous, keyFor(index)])} />
-                <span><strong>{ingredientName(line.ingredientId)}</strong><small>{line.packageCount} × {product?.label ?? line.productId}</small></span><strong>{formatMoney(line.subtotal)}</strong>
+                <span><strong>{ingredientName(line.ingredientId)}</strong><small>{line.packageCount} × {productLabel(product) ?? line.productId}</small></span><strong>{formatMoney(line.subtotal)}</strong>
               </label>
+              {offers.filter(offer => offer.product.id === line.productId).map(offer => <p className="small-note" key={offer.product.id}>
+                {offer.provenance.providerId} · {offer.provenance.channel} · retrieved {new Date(offer.provenance.retrievedAt).toLocaleString()} · valid until {new Date(offer.provenance.expiresAt).toLocaleString()}
+                {offer.provenance.sourceUrl && safeExternalUrl(offer.provenance.sourceUrl) && <> · <a href={safeExternalUrl(offer.provenance.sourceUrl)} target="_blank" rel="noreferrer">Product source</a></>}
+              </p>)}
               {showUsage && <p className="usage-details">Buy {line.purchased.quantity} {line.purchased.unit} · use {line.required.quantity} {line.required.unit} · leftover {line.leftover.quantity} {line.leftover.unit}</p>}
             </div>;
           })}</div> : null;
         })}
-        <p className="list-total">Illustrative total <strong>{basket?.status === "complete" ? formatMoney(basket.total) : "Unavailable"}</strong></p>
+        <p className="list-total">{basisLabel} total <strong>{basket?.status === "complete" ? formatMoney(basket.total) : "Unavailable"}</strong></p>
         <p className="result-footnote">Whole packages. Excludes taxes, fees, deposits, delivery, and discounts. Leftovers are unused package contents.</p>
       </>}
 
@@ -121,7 +134,7 @@ function FeasiblePlan({ result, stores, recipes, ingredients, products, onEdit }
         <p className="data-note">Estimated totals · all meals and servings</p>
         <div className="nutrition-grid">{([ ["Energy", nutrition.caloriesKcal, "kcal"], ["Protein", nutrition.proteinG, "g"], ["Carbs", nutrition.carbsG, "g"], ["Fat", nutrition.fatG, "g"], ["Fiber", nutrition.fiberG, "g"] ] as const).map(([label, value, unit]) => <div key={label}><span>{label}</span><strong>{Math.round(value)} <small>{unit}</small></strong></div>)}</div>
         <p className="result-footnote">Not daily nutrition targets. Check actual product labels for allergens and substitutions.</p>
-        {result.ingredientReuse.length > 0 && <details className="disclosure reuse-list"><summary>Ingredient reuse</summary>{result.ingredientReuse.map(item => <p key={item.ingredientId}>{ingredientName(item.ingredientId)} · {item.recipeIds.length} recipes · {item.packagesAvoided} packages avoided · {formatMoney(item.estimatedSavings)} illustrative savings versus separate meal purchases.</p>)}</details>}
+        {result.ingredientReuse.length > 0 && <details className="disclosure reuse-list"><summary>Ingredient reuse</summary>{result.ingredientReuse.map(item => <p key={item.ingredientId}>{ingredientName(item.ingredientId)} · {item.recipeIds.length} recipes · {item.packagesAvoided} packages avoided · {formatMoney(item.estimatedSavings)} {basisLabel.toLowerCase()} savings versus separate meal purchases.</p>)}</details>}
       </>}
     </section>
     {(view === "meals" || view === "stores") && <p className="result-footnote">{result.optimality === "best-found" ? "Best plan found. Search may be incomplete." : "Best plan within the searched catalog."}</p>}
