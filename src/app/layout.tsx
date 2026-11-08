@@ -7,11 +7,11 @@ const dmSans = localFont({ src: "./fonts/dm-sans.ttf", variable: "--font-app", w
 
 export const metadata: Metadata = {
   title: { default: "ShopMate", template: "%s · ShopMate" },
-  description: "Plan meals and compare grocery baskets for your household.",
+  description: "Your groceries, your budget, your meals. Discover grocery stores, compare available prices, and bring your next meal plan together with ShopMate.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en" className={dmSans.variable}><body>
+  return <html lang="en" className={dmSans.variable} data-scroll-behavior="smooth"><body>
     <a href="#main-content" className="skip-link">Skip to content</a>
     <Header />
     <main id="main-content">{children}</main>

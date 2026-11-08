@@ -1,44 +1,32 @@
-# ShopMate frontend
+# ShopMate frontend — market design
 
-ShopMate now starts directly with country selection. Home and `/demo` share one interactive planner; pages remain Server Components and pass existing catalog metadata to the client. Backend routes, providers, contracts, catalog, configuration, dependencies, and lockfile are unchanged.
+The homepage now introduces ShopMate with an original grocery-tote illustration, bold local typography, a concise three-step guide, and clear links into the planner. `/plan` runs the existing live journey; `/demo` remains a separate, explicitly illustrative experience. Pages remain Server Components and pass the existing catalog to the interactive planner.
 
-## Visual revision
+## Visual identity
 
-The previous design repeated marketing copy, provenance explanations, and decorative card treatments. It also added an unnecessary welcome screen and illustrated sidebar. This revision removes those structures instead of adjusting their padding.
+- Warm cream, forest, sage, apricot and butter colours; generous desktop spacing and a compact mobile flow.
+- Original inline SVG groceries, food illustrations and line icons in `grocery-art.tsx`. No external artwork, stock photos, image requests or animation dependencies.
+- The reference at https://dh26.dubhacks.co/ was inspected for its bold typography, integrated illustration and playful interactions. Its artwork, branding, code and layouts were not reused.
+- Reusable market labels, paper details, rounded selection cards, clear progress, illustrated loading/empty states and a shopping-list completion bar.
+- Local DM Sans and its existing OFL license are retained. Replaced photographs and their credit UI are removed; the old `/credits` URL redirects home.
+- Hover, selection and gentle SVG animations respect reduced-motion preferences. Forms retain visible focus, labels, validation, keyboard submission and live status feedback.
 
-- One 480px app column at desktop sizes, with the same flow on mobile.
-- Short headings and labels; no marketing hero, slogans, feature grid, sidebar, gradients, floating panels, badges, emoji illustrations, or food SVGs.
-- Locally hosted DM Sans, quiet borders, restrained cream/forest/sage colours, and flat store, meal, and grocery rows.
-- Real, locally stored photography. Source and license records are in `public/photos/README.md`; the app has a photo-credit page. DM Sans includes its OFL license in `src/app/fonts/`.
-- Allergens, ingredient exclusions, review details, and package quantities expand only when requested. Necessary fictional-store, illustrative-price, and estimated-nutrition labels remain visible.
+## Preserved integrations and truth rules
 
-The exact [Mise Android listing](https://play.google.com/store/apps/details?id=com.gregorytaylor.shopping&hl=en_CA), package `com.gregorytaylor.shopping`, was revisited in the browser. Its publicly accessible preferences screenshot was inspected again, alongside the four screenshots inspected previously. No installed/private screens were accessed. The reference informed compact controls, short copy, food photography, and grouped checklists; ShopMate retains its own branding.
+Backend routes, providers, contracts, catalog, root configuration, dependencies and lockfile are unchanged. The existing v2 discovery, pricing preflight and optimization requests retain their validation, cancellation and dependent-state clearing.
 
-## Workflow and integrations
+Fictional stores, illustrative prices and estimated nutrition remain visible beside relevant content. Unavailable pricing never becomes a comparable zero-cost basket. Complete baskets, package quantities, currency, budget balances and nutrition come from existing server responses. Capped and exhausted searches retain distinct results. Multiple stores compare whole baskets; purchases are not split.
 
-1. Country, postal/ZIP code, and radius.
-2. Returned stores and addresses; select 1–3 stores.
-3. Household, budget, diet, optional allergen/ingredient exclusions, and protein preference.
-4. Meal count, objective, optional review, then submit.
-5. Loading, errors, infeasible/incomplete results, or meals, store comparisons, shopping lists, and nutrition.
+The official `public/google-maps-logo.svg` and provider attribution rendering are retained. Price provenance, quote channel, retrieval/expiry, exclusions and safe source links remain in live results. A failed live search offers a separate sample link rather than switching modes.
 
-The integrated planner uses v2 store discovery, selected-store pricing preflight, and optimization. The server-rendered catalog includes its revision; the browser submits it with pricing and optimization. Strict v1 compatibility parsing remains for tests/legacy consumers, alongside v2 schemas and mode/country/currency/catalog/basket checks. Request cancellation and state invalidation remain intact. No browser location storage or query-string postal code was added. Back navigation retains preferences; location changes clear dependent stores/results. Failed live requests never become sample success.
+## Verification
 
-Demo discovery, pricing and optimization now complete the five-step journey without credentials, using fictional stores and illustrative prices. Google discovery requires GOOGLE_MAPS_API_KEY. Verified live optimization requires REEF_KEY plus reviewed branch/product mappings; unsupported stores remain unavailable and never receive sample prices. Results use the actual offer package names/sizes and show quote channel, retrieval/expiry and source links. Nutrition remains estimated; store selection compares whole baskets rather than split purchases. See [integration verification](../../docs/INTEGRATION.md) and [pricing setup](../../docs/PRICING.md).
+Frontend regression tests in `tests/frontend-design.test.ts` render actual CA/US demo route responses and check illustrative/estimated labels, explicit currencies and original artwork. They also cover capped-search copy and unavailable pricing without an invented total. Existing journey and v2 integration tests remain intact.
 
-`public/google-maps-logo.svg` remains the unmodified official attribution asset for live store results. Public policies and other live-launch gates remain backend/integration dependencies in the shared deployment documentation.
+Browser checks include desktop and mobile layouts, postal/ZIP and budget validation, explicit sample entry, multiple stores, preferences/exclusions, review/back navigation, actual generated demo meals, recipe details, comparisons, checked groceries, copied lists, alternate-store lists, estimated nutrition and an unaffordable-budget result.
 
-## Verification — November 7, 2026
+Live Google discovery and verified retailer success require provider credentials and reviewed coverage. Browser QA observes the real unconfigured-search state; it does not claim a credentialed live run. Printing is available but no physical print job is sent. No formal accessibility audit is claimed.
 
-`npm run verify` passed after the final code changes: lint, strict TypeScript, 5 files / 93 tests, production build, and 13 production HTTP smoke requests. `git diff --check` passed.
+Final checks (November 7, 2026): `npm run lint`, `npm run typecheck` and `npm test` passed: 16 test files / 255 tests, with 2 credential-gated files / 4 tests skipped. The default `npm run verify` reached a Turbopack CSS-worker failure, reproduced outside the Windows sandbox. `npm run build -- --webpack` passed using Next.js's documented bundler option; no build configuration was changed. `npm run test:smoke` passed all 27 production HTTP requests. The smoke script changes cover only the redesigned homepage, `/plan` entry and brand-style assertions; API checks are retained.
 
-Browser checks used the final production build plus earlier development checks:
-
-- Inspected desktop at 1280 × 900 and mobile at 390 × 844; checked the 320px entry breakpoint. No horizontal overflow in inspected states.
-- Tested Canadian empty/invalid postal codes, US country switching, leading-zero ZIP submission, keyboard submit, and honest live 501 handling.
-- Tested explicit CA/US sample entry, multiple store selection, household and meal counters, budget validation, diets, allergen and canonical ingredient exclusions, protein preference, review, back navigation/state retention, and actual optimization 501 handling.
-- Verified all five local photographs loaded on the credits page.
-- Inspected meal photos/details, store comparison, grocery checks, copy confirmation, store switching, package details, and nutrition using an isolated synthetic response on a temporary loopback test proxy. The fixture used existing illustrative catalog data. It was not a response from the real optimizer, was never imported by the app, and the proxy was stopped after QA. Temporary test artifacts live only in git-ignored `artifacts/`.
-- The print control is present; no physical print job was sent. No formal accessibility audit or real provider/optimizer success is claimed.
-
-Screenshots were saved outside the repository in the chat's visualization directory: `shopmate-desktop.jpg`, `shopmate-mobile.jpg`, `shopmate-mobile-stores.jpg`, `shopmate-mobile-preferences.jpg`, and explicitly named synthetic-result captures. Temporary viewport overrides were reset. The production preview remains running at http://127.0.0.1:3001.
+The resulting production build was inspected at 1280 × 900, 768 × 1024, 390 × 844 and 320 × 800. Inspected views had no horizontal overflow. The production CA sample journey retained budget/diet/meal choices through back navigation, completed a real demo optimization, and displayed whole-basket comparisons and keyboard-operated grocery progress. Earlier US development-browser checks covered the full journey, recipe details, copied lists, alternate stores, nutrition and low-budget results. The production browser reported no warnings or errors. Desktop/mobile captures were saved outside Git in the chat's visualization directory; temporary viewport overrides were cleared.

@@ -44,13 +44,17 @@ try {
   }
   assert(ready, `Production server did not become ready: ${output}`);
   const home = await (await get("/")).text();
-  assert(home.includes("Choose your country"));
-  assert(home.includes("Canada")); assert(home.includes("United States"));
-  assert(!home.includes("hero-visual"), "The entry page must start with the location flow");
+  assert(home.includes("Your groceries."));
+  assert(home.includes('href="/plan"'), "The homepage must link to the planner");
+  assert(home.includes("Find your stores") && home.includes("Compare your options") && home.includes("Plan your meals"));
+  assert(!home.includes("/photos/") && !home.includes("Photo credits"), "Replaced stock photos must not return");
+  const planner = await (await get("/plan")).text();
+  assert(planner.includes("Choose your country"));
+  assert(planner.includes("Canada")); assert(planner.includes("United States"));
   const cssPath = home.match(/href="([^"]+\.css(?:\?[^"]*)?)"/)?.[1];
   assert(cssPath, "The home page must load generated CSS");
   const css = await (await get(cssPath.replaceAll("&amp;", "&"))).text();
-  assert(/#f7f6f0/i.test(css), "Brand styles must be present in the production CSS");
+  assert(/--forest:/.test(css) && /--cream:/.test(css), "Brand styles must be present in the production CSS");
   for (const country of ["CA", "US"]) {
     const page = await (await get(`/demo?country=${country}`)).text();
     assert(page.includes("fictional")); assert(page.includes(country === "CA" ? "CAD" : "USD"));
