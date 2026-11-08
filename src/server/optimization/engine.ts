@@ -197,7 +197,7 @@ export function createPackageOptimizer<B extends PriceBasis>(basis: B, options: 
     if (!best) {
       if (!exhaustive) return { ...base(), status: "incomplete", reason: "search-limit", message: "The search limit was reached without finding a fully priced plan within your budget. Other combinations may still work." };
       return { ...base(), status: "infeasible", reason: Number.isFinite(minimumKnown) ? "budget" : "pricing-unavailable",
-        message: Number.isFinite(minimumKnown) ? "No fully priced plan in this catalog fits the selected budget." : "No plan in this catalog has complete ingredient pricing at any selected store.",
+        message: Number.isFinite(minimumKnown) ? "No fully priced plan in this catalog fits the selected budget." : "Ingredient prices unavailable. No plan in this catalog has complete ingredient pricing at any selected store. Choose other stores.",
         minimumKnownCost: Number.isFinite(minimumKnown) ? { amountCents: minimumKnown, currency } : null };
     }
     const winner = best;

@@ -11,7 +11,7 @@ function geocode(country: Country = "CA", postal = country === "CA" ? "M5V 2T6" 
   ], geometry: { location: { lat: 0, lng: 0 } } }] };
 }
 function place(id = "synthetic", country: Country = "CA") {
-  return { id, displayName: { text: "Synthetic grocery" }, formattedAddress: "Synthetic address, test only", addressComponents: [{ types: ["country"], shortText: country }],
+  return { id, displayName: { text: "Walmart" }, formattedAddress: "Synthetic address, test only", addressComponents: [{ types: ["country"], shortText: country }],
     location: { latitude: 0, longitude: .01 }, googleMapsUri: "https://maps.google.com/?cid=123", types: ["grocery_store"], businessStatus: "OPERATIONAL" };
 }
 function provider(...responses: unknown[]) {
@@ -35,7 +35,7 @@ describe("Google discovery", () => {
     expect(init.method).toBe("POST"); expect(init.cache).toBe("no-store"); expect(init.redirect).toBe("error");
     expect(new Headers(init.headers).get("X-Goog-FieldMask")).toContain("places.attributions");
     expect(new Headers(init.headers).get("X-Goog-FieldMask")).not.toContain("*");
-    expect(JSON.parse(String(init.body))).toMatchObject({ maxResultCount: 12, rankPreference: "DISTANCE", locationRestriction: { circle: { radius: 5000 } } });
+    expect(JSON.parse(String(init.body))).toMatchObject({ maxResultCount: 20, rankPreference: "DISTANCE", locationRestriction: { circle: { radius: 5000 } } });
     expect(init.signal).toBeInstanceOf(AbortSignal);
     expect(result.stores[0]).toMatchObject({ id: "google:synthetic", source: "google", name: item.displayName.text, address: item.formattedAddress, distanceMeters: 1112, pricing: { status: "unavailable", profileId: null } });
     expect(result.attributions).toEqual([{ provider: "google-maps", displayName: "Synthetic attribution", uri: "https://example.org/license" }]);
@@ -56,7 +56,7 @@ describe("Google discovery", () => {
     expect((await provider(response, {}).google.discover(input)).location.postalCode).toBe("02108-1234");
   });
   it("filters cross-border, closed, non-grocery, distant and duplicate places; sorts stable distances", async () => {
-    const close = { ...place("z"), location: { latitude: 0, longitude: .005 } };
+    const close = { ...place("z"), displayName: { text: "Sobeys" }, location: { latitude: 0, longitude: .005 } };
     const { google } = provider(geocode(), { places: [place("a"), close, close, place("cross", "US"), { ...place("closed"), businessStatus: "CLOSED_PERMANENTLY" },
       { ...place("fuel"), types: ["gas_station"] }, { ...place("far"), location: { latitude: 1, longitude: 1 } }] });
     expect((await google.discover(request())).stores.map(store => store.id)).toEqual(["google:z", "google:a"]);

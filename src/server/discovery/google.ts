@@ -2,7 +2,7 @@ import "server-only";
 import { z } from "zod";
 import { currencyForCountry, storeDiscoveryRequestSchema, type Attribution, type Coordinates, type Country, type GoogleStore } from "@/contracts";
 import { ServiceError, invalidRequest } from "@/server/errors";
-import { matchChain } from "@/server/discovery/chains";
+import { matchChain, matchGroceryBanner } from "@/server/discovery/chains";
 import type { ResolvedStore, StoreDiscoveryProvider } from "@/server/discovery/provider";
 
 const coordinate = z.object({ latitude: z.number().min(-90).max(90), longitude: z.number().min(-180).max(180) });
@@ -10,7 +10,7 @@ const placeSchema = z.object({
   id: z.string().regex(/^[A-Za-z0-9_-]{1,240}$/),
   displayName: z.object({ text: z.string().trim().min(1).max(500) }), formattedAddress: z.string().trim().min(1).max(2000),
   addressComponents: z.array(z.object({ shortText: z.string().optional(), types: z.array(z.string()) })),
-  location: coordinate, googleMapsUri: z.string(), types: z.array(z.string()), businessStatus: z.string().optional(),
+  location: coordinate, googleMapsUri: z.string(), types: z.array(z.string()), primaryType: z.string().optional(), businessStatus: z.string().optional(),
   attributions: z.array(z.object({ provider: z.string().min(1), providerUri: z.string() })).optional(),
 });
 type Place = z.infer<typeof placeSchema>;
@@ -19,8 +19,9 @@ const geocodeSchema = z.object({ status: z.string(), results: z.array(z.object({
   address_components: z.array(z.object({ short_name: z.string(), types: z.array(z.string()) })),
   geometry: z.object({ location: z.object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) }) }),
 })).optional() });
-const PLACE_FIELDS = "id,displayName,formattedAddress,addressComponents,location,googleMapsUri,types,businessStatus,attributions";
+const PLACE_FIELDS = "id,displayName,formattedAddress,addressComponents,location,googleMapsUri,types,primaryType,businessStatus,attributions";
 const groceryTypes = new Set(["grocery_store", "supermarket"]);
+const excludedPrimaryTypes = new Set(["pharmacy", "drugstore", "gas_station", "convenience_store", "liquor_store", "wholesaler"]);
 const providerError = () => new ServiceError(502, { code: "provider-error", message: "The store provider couldn’t complete the request. Please try again." });
 const quotaError = () => new ServiceError(429, { code: "rate-limited", message: "Store search is busy. Please wait before trying again." });
 const notFound = () => new ServiceError(404, { code: "not-found", message: "No matching location was found in the selected country." });
@@ -59,6 +60,9 @@ function publicUri(value: string, mapsOnly = false): string {
 function countryOf(place: Place): string | undefined { return place.addressComponents.find(item => item.types.includes("country"))?.shortText; }
 function validGrocery(place: Place, country: Country): boolean {
   return countryOf(place) === country && place.types.some(type => groceryTypes.has(type))
+    && !excludedPrimaryTypes.has(place.primaryType ?? "")
+    && (Boolean(place.primaryType) || !place.types.some(type => excludedPrimaryTypes.has(type)))
+    && matchGroceryBanner(place.displayName.text, country) !== null
     && (!place.businessStatus || place.businessStatus === "OPERATIONAL");
 }
 function identity(place: Place, country: Country): ResolvedStore {
@@ -115,11 +119,12 @@ export function createGoogleStoreDiscovery(options: GoogleOptions = {}): StoreDi
       const coordinates = { latitude: origin.geometry.location.lat, longitude: origin.geometry.location.lng };
       const response = z.object({ places: z.array(z.unknown()).max(20).optional() }).safeParse(await json("https://places.googleapis.com/v1/places:searchNearby", {
         method: "POST", headers: { "Content-Type": "application/json", "X-Goog-Api-Key": apiKey, "X-Goog-FieldMask": PLACE_FIELDS.split(",").map(field => `places.${field}`).join(",") },
-        body: JSON.stringify({ includedTypes: [...groceryTypes], maxResultCount: 12, rankPreference: "DISTANCE", languageCode: "en", regionCode: request.location.country,
+        body: JSON.stringify({ includedTypes: [...groceryTypes], maxResultCount: 20, rankPreference: "DISTANCE", languageCode: "en", regionCode: request.location.country,
           locationRestriction: { circle: { center: coordinates, radius: request.radiusKm * 1000 } } }),
       }));
       if (!response.success) throw providerError();
-      const stores: GoogleStore[] = [];
+      const candidates: { store: GoogleStore; bannerId: string; place: Place }[] = [];
+      const placeIds = new Set<string>();
       const attributions = new Map<string, Attribution>();
       for (const raw of response.data.places ?? []) {
         const parsed = placeSchema.safeParse(raw);
@@ -127,18 +132,30 @@ export function createGoogleStoreDiscovery(options: GoogleOptions = {}): StoreDi
         const place = parsed.data;
         if (!validGrocery(place, request.location.country)) continue;
         const distance = distanceMeters(coordinates, place.location);
-        if (distance > request.radiusKm * 1000 || stores.some(store => store.googlePlaceId === place.id)) continue;
+        if (distance > request.radiusKm * 1000 || placeIds.has(place.id)) continue;
+        placeIds.add(place.id);
         const base = identity(place, request.location.country);
-        stores.push({ ...base, source: "google", googlePlaceId: place.id, coordinates: place.location, distanceMeters: distance, googleMapsUri: publicUri(place.googleMapsUri, true) });
+        candidates.push({ bannerId: matchGroceryBanner(place.displayName.text, request.location.country)!.id, place,
+          store: { ...base, source: "google", googlePlaceId: place.id, coordinates: place.location, distanceMeters: distance, googleMapsUri: publicUri(place.googleMapsUri, true) } });
+      }
+      candidates.sort((a, b) => a.store.distanceMeters - b.store.distanceMeters || a.store.id.localeCompare(b.store.id, "en"));
+      const banners = new Set<string>();
+      const stores: GoogleStore[] = [];
+      for (const { bannerId, store, place } of candidates) {
+        if (banners.has(bannerId)) continue;
+        banners.add(bannerId);
+        stores.push(store);
         for (const attribution of place.attributions ?? []) {
           const uri = publicUri(attribution.providerUri);
           attributions.set(`${attribution.provider}:${uri}`, { provider: "google-maps", displayName: attribution.provider, uri });
         }
       }
-      stores.sort((a, b) => a.distanceMeters - b.distanceMeters || a.id.localeCompare(b.id, "en"));
       return { mode: "live", location: { ...request.location, currency: currencyForCountry(request.location.country) },
         origin: { label: origin.formatted_address, coordinates }, radiusKm: request.radiusKm, stores,
-        attributions: [...attributions.values()], notices: ["Store names, addresses and locations are provided by Google Maps. Distances are straight-line, not driving distances.",
+        attributions: [...attributions.values()], notices: ["Major grocery chains · nearest location per banner.",
+          "Only the nearest returned branch of each eligible banner is shown from up to 20 Google candidates. This bounded search does not establish every nearby chain or branch.",
+          ...(stores.length ? [] : ["No eligible major grocery chains were returned in this search. Try a wider radius or another location; other stores may exist nearby."]),
+          "Store names, addresses and locations are provided by Google Maps. Distances are straight-line, not driving distances.",
           "Store discovery does not supply product prices. Request verified pricing separately; sample optimization is available only in explicit demo mode."] };
     },
     async resolveStores(ids, country) {
@@ -151,7 +168,7 @@ export function createGoogleStoreDiscovery(options: GoogleOptions = {}): StoreDi
         catch (error) { if (error instanceof ServiceError && error.status === 404) invalidRequest("storeIds", "A selected store no longer exists."); throw error; }
         const parsed = placeSchema.safeParse(raw);
         if (!parsed.success) throw providerError();
-        if (parsed.data.id !== placeId || !validGrocery(parsed.data, country)) invalidRequest("storeIds", "A selected store is not an operating grocery store in this country.");
+        if (parsed.data.id !== placeId || !validGrocery(parsed.data, country)) invalidRequest("storeIds", "A selected store is unavailable or is not an operating eligible major grocery chain in this country. Choose other stores.");
         return identity(parsed.data, country);
       }));
     },
