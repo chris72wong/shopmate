@@ -1,5 +1,25 @@
 # ShopMate integration verification
 
+## Latest local merge — November 7, 2026
+
+Performed on local `main` in `C:/Users/myste/OneDrive/Desktop/shopmate/shopmate`, starting from clean commit `e07ff1e`. Both source worktrees were also clean.
+
+- Backend first: detached worktree `757d`, commit `f0614a91646c10d95f56b79de96f3ced105826c8` (major grocery banners, nearest returned branch per banner and pricing coverage/errors), preserved by merge `95196cb`.
+- Frontend second: branch `codex/frontend-market-refresh` in worktree `fa55`, commits `db85f95` and `6220751ec7a000d4d14370af3d69d8ea486a1c0f` (market artwork and concise animated frontend), preserved by merge `10f206f`.
+- Both merges completed without textual conflicts. No source checkout, branch or worktree was modified, reset or deleted. Nothing was pushed.
+
+Integration fixes preserve the existing v2 contracts and design. A successful preflight with no usable offers now stays on Stores, retains the selection and offers retry, another selection or explicit demo entry. Partial coverage may continue with missing items visible. Final `pricing-unavailable` results offer store selection; budget/dietary failures retain preference editing. Regression checks cover unsupported branches, empty offers, unavailable offers, partial sample coverage and pricing-specific result copy.
+
+`npm run build` now uses Next.js's supported `next build --webpack`. The initial default Turbopack build reproduced the CSS-worker exit documented by both source worktrees. No dependency or lockfile change was needed.
+
+- Final `npm run verify` **passed** with normal local process/loopback access: lint, strict typecheck, **495 tests passed / 4 optional network probes skipped in 21 files**, `npm run build`, and **27 production HTTP smoke requests**. An earlier sandboxed run built successfully but its HTTP readiness probe could not reach loopback; that run is not counted as a passing verify.
+- Production browser checks at `http://127.0.0.1:3117` passed: empty postal validation, country/currency switching, leading-zero ZIP keyboard submission, explicit missing-Google error without demo fallback, voluntary sample entry, US one-store planning, CA three-store pricing/comparisons, CAD/USD totals, shopping list, keyboard grocery checking, estimated nutrition, and budget failure followed by successful preference recovery.
+- Desktop and 390 × 844 mobile views were inspected. The inspected mobile comparisons/list had no horizontal overflow. The checked browser console had no warnings/errors. The viewport override was reset and the temporary production server stopped.
+- Browser checks deliberately disabled paid provider access for that process. Credentialed Google/retailer success, real basket coverage, and live zero-offer screens remain unverified in a browser; synthetic tests cover those pricing states. The sample journey is ready for further end-to-end browser testing. Existing live-launch requirements in [DEPLOYMENT.md](DEPLOYMENT.md) remain.
+- `git diff --check` passed. No build output, temporary screenshots, environment files or credentials are included.
+
+## Earlier integration record (historical)
+
 November 7, 2026. Integration was performed in the original `C:/Users/myste/Desktop/shopmate` checkout on `main`.
 
 ## Git provenance and preserved work

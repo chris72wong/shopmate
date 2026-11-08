@@ -14,7 +14,7 @@ import { demoStoreDiscovery } from "@/server/discovery/demo";
 import { CATALOG_VERSION } from "@/server/pricing/service";
 import { jsonRequest } from "./fixtures";
 
-const props = { recipes, ingredients, products, stores: [], onEdit: () => undefined };
+const props = { recipes, ingredients, products, stores: [], onEdit: () => undefined, onChooseStores: () => undefined };
 
 describe("redesigned results retain product honesty", () => {
   it.each(["CA", "US"] as const)("keeps a real %s demo response illustrative with estimated nutrition and original artwork", async country => {
@@ -47,7 +47,9 @@ describe("redesigned results retain product honesty", () => {
       message: "Prices are unavailable for the required ingredients." };
     const html = renderToStaticMarkup(createElement(PlanResults, { ...props, result }));
     expect(html).toContain(result.message);
-    expect(html).toContain("Edit preferences");
+    expect(html).toContain("Ingredient prices unavailable");
+    expect(html).toContain("Choose other stores");
+    expect(html).not.toContain("Edit preferences");
     expect(html).not.toMatch(/CAD|USD|Lowest known cost|Basket total/);
   });
 });

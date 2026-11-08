@@ -51,11 +51,15 @@ export function plannerReducer(state: PlannerState, action: PlannerAction): Plan
       if (!selected && state.storeIds.length >= 3) return state;
       return { ...state, pricing: null, result: null, storeIds: selected ? state.storeIds.filter(id => id !== action.id) : [...state.storeIds, action.id] };
     }
-    case "pricing": return { ...state, pricing: action.data, result: null };
+    case "pricing": return { ...state, pricing: action.data, result: null, step: hasUsablePricing(action.data) ? 3 : 2 };
     case "preferences": return { ...state, preferences: action.preferences, result: null };
     case "result": return { ...state, result: action.result };
     case "clear-result": return { ...state, result: null };
   }
+}
+
+export function hasUsablePricing(pricing: PricingResultV2): boolean {
+  return pricing.stores.some(store => store.status === "available" && store.offers.some(offer => offer.available));
 }
 
 export function budgetCents(value: string): number | null {

@@ -14,18 +14,20 @@ interface ResultProps {
   ingredients: Ingredient[];
   products: ProductPackage[];
   onEdit: () => void;
+  onChooseStores: () => void;
 }
 
 export function PlanResults(props: ResultProps) {
-  const { result, onEdit } = props;
+  const { result, onEdit, onChooseStores } = props;
+  const pricingUnavailable = result.status === "infeasible" && result.reason === "pricing-unavailable";
   if (result.status !== "feasible") return <>
-    <SectionHeading title={result.status === "incomplete" ? "Search paused" : "No matching plan"} />
+    <SectionHeading title={pricingUnavailable ? "Ingredient prices unavailable" : result.status === "incomplete" ? "Search paused" : "No matching plan"} />
     <div className="empty-state">
       <span className="state-icon"><Icon name={result.status === "incomplete" ? "bowl" : "basket"} /></span>
       <p>{result.message}</p>
       {result.status === "incomplete" && <p className="small-note">The search ended early. A plan may still be possible.</p>}
       {result.status === "infeasible" && result.minimumKnownCost && <p className="small-note">Lowest known cost: {formatMoney(result.minimumKnownCost)} · {result.pricingBasis === "verified" ? "verified quote" : "illustrative"}</p>}
-      <button className="button button-primary" onClick={onEdit}>Edit preferences</button>
+      <button className="button button-primary" onClick={pricingUnavailable ? onChooseStores : onEdit}>{pricingUnavailable ? "Choose other stores" : "Edit preferences"}</button>
     </div>
     <Notices items={result.notices} />
   </>;

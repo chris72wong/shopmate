@@ -33,7 +33,7 @@ describe("v2 contract and routing", () => {
     expect(body.data.optimizerVersion).toBeTruthy();
     const parsed = optimizationV2ViewSchema.parse(body.data);
     expect(planV2MatchesRequest(parsed, input)).toBe(true);
-    const markup = renderToStaticMarkup(createElement(PlanResults, { result: parsed, stores, ingredients, recipes, products, onEdit: () => {} }));
+    const markup = renderToStaticMarkup(createElement(PlanResults, { result: parsed, stores, ingredients, recipes, products, onEdit: () => {}, onChooseStores: () => {} }));
     expect(markup).toContain("Illustrative prices");
     expect(planV2MatchesRequest({ ...parsed, pricingBasis: "verified" }, input)).toBe(false);
     expect(planV2MatchesRequest(parsed, { ...input, catalogVersion: "stale" })).toBe(false);
@@ -96,7 +96,7 @@ describe("v2 contract and routing", () => {
     expect(result.search.candidateRecipeIds).toContain("chickpea-rice-bowl");
     const parsed = optimizationV2ViewSchema.parse(result);
     expect(planV2MatchesRequest(parsed, input)).toBe(true);
-    const markup = renderToStaticMarkup(createElement(PlanResults, { result: parsed, stores, ingredients, recipes, products, onEdit: () => {} }));
+    const markup = renderToStaticMarkup(createElement(PlanResults, { result: parsed, stores, ingredients, recipes, products, onEdit: () => {}, onChooseStores: () => {} }));
     expect(markup).toContain("Verified branch quotes");
     expect(markup).toContain("pickup"); expect(markup).toContain("retrieved");
     expect(markup).not.toContain("Illustrative prices");
